@@ -1,0 +1,129 @@
+# OrbitFlare Yellowstone gRPC (Geyser) — Full Config Reference
+# Usage: orbitflare grpc --config examples/grpc-stream.yml
+
+commitment: confirmed    # processed | confirmed | finalized
+
+transactions:
+  pumpfun:
+    vote: false
+    failed: false
+    account_required:
+      - "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+    account_include: []
+    account_exclude: []
+
+  jupiter-swaps:
+    vote: false
+    account_include:
+      - "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+    account_exclude: []
+    account_required: []
+
+  raydium-amm:
+    vote: false
+    account_required:
+      - "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
+    account_include: []
+    account_exclude: []
+
+  raydium-cpmm:
+    vote: false
+    failed: false
+    account_required:
+      - "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
+    account_include: []
+    account_exclude: []
+
+  orca-whirlpool:
+    vote: false
+    failed: false
+    account_required:
+      - "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+    account_include: []
+    account_exclude: []
+
+  my-wallet:
+    vote: false
+    account_include:
+      - "Dv5tkHtFPHbQWncFqHB7Hdi3TJfgKE3W2vFhqspBVJPP"
+    account_exclude:
+      - "Vote111111111111111111111111111111111111111"
+    account_required: []
+
+  defi-failures:
+    vote: false
+    failed: true
+    account_include:
+      - "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+      - "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
+      - "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
+      - "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+      - "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+    account_exclude: []
+    account_required: []
+
+  defi-broad:
+    vote: false
+    failed: false
+    account_include:
+      - "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+      - "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
+      - "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
+      - "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+      - "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+    account_exclude:
+      - "Vote111111111111111111111111111111111111111"
+    account_required: []
+
+  validator-votes:
+    vote: true
+    failed: false
+    account_include: []
+    account_exclude: []
+    account_required: []
+
+accounts:
+  my-wallet:
+    account:
+      - "Dv5tkHtFPHbQWncFqHB7Hdi3TJfgKE3W2vFhqspBVJPP"
+    owner: []
+
+  spl-token-accounts:
+    account: []
+    owner:
+      - "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+
+  token-2022-accounts:
+    account: []
+    owner:
+      - "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+
+  raydium-pool:
+    account:
+      - "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2"
+    owner: []
+
+  pumpfun-state:
+    account: []
+    owner:
+      - "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+
+  mint-accounts:
+    account:
+      - "So11111111111111111111111111111111111111112"
+      - "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      - "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+    owner: []
+
+slots:
+  all-slots:
+    filter_by_commitment: false
+
+timeout_secs: 30
+tcp_keepalive_secs: 60
+
+reconnect:
+  initial_delay_ms: 100
+  max_delay_ms: 30000
+  multiplier: 2.0
+  max_retries: 0
