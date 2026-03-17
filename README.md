@@ -65,7 +65,7 @@ orbitflare auth login --wallet ~/.config/solana/id.json
 orbitflare auth login
 ```
 
-The API key (`X-ORBIT-KEY`) authenticates against the OrbitFlare Customer API. The license key authenticates RPC/gRPC endpoints and is fetched automatically during login, or set manually:
+The API key (`X-ORBIT-KEY`) authenticates against the OrbitFlare Customer API. The license key authenticates RPC endpoints and is fetched automatically during login, or set manually. gRPC and Jetstream use IP whitelisting.
 
 ```bash
 orbitflare auth set-license-key <KEY>

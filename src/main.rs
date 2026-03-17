@@ -184,9 +184,7 @@ async fn dispatch(cli: Cli) -> CliResult<()> {
             } else {
                 config.endpoints.grpc.fallback_url.clone()
             };
-            let x_token = profile
-                .and_then(|p| keyring_store::get_secret(p, "api_key"));
-            commands::grpc::run(args, &config, Some(&primary), &grpc_fallbacks, x_token.as_deref()).await
+            commands::grpc::run(args, &config, Some(&primary), &grpc_fallbacks).await
         }
         Commands::Rpc { command } => {
             let ctx = rpc_ctx.unwrap();

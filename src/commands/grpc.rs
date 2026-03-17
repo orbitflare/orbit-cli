@@ -13,7 +13,6 @@ use std::time::{Duration, Instant};
 use tokio::signal;
 use tokio::sync::watch;
 use tokio_stream::StreamExt;
-use tonic::metadata::MetadataValue;
 use tonic::transport::Channel;
 
 #[derive(Deserialize)]
@@ -168,7 +167,6 @@ pub async fn run(
     config: &Config,
     grpc_override: Option<&str>,
     fallback_overrides: &[String],
-    x_token: Option<&str>,
 ) -> CliResult<()> {
     let raw = std::fs::read_to_string(&args.config).map_err(|e| {
         format!(
@@ -225,7 +223,6 @@ pub async fn run(
         &subscribe_request,
         shutdown_rx,
         &mut stats,
-        x_token,
     )
     .await?;
 
@@ -431,7 +428,6 @@ async fn run_with_reconnect(
     subscribe_request: &SubscribeRequest,
     mut shutdown_rx: watch::Receiver<bool>,
     stats: &mut StreamStats,
-    x_token: Option<&str>,
 ) -> CliResult<()> {
     let mut delay_ms = config.reconnect.initial_delay_ms;
     let mut attempt: u64 = 0;
@@ -445,7 +441,7 @@ async fn run_with_reconnect(
         attempt += 1;
         let endpoint = &endpoints[endpoint_idx];
 
-        match connect_and_stream(endpoint, config, subscribe_request, &mut shutdown_rx, stats, x_token).await
+        match connect_and_stream(endpoint, config, subscribe_request, &mut shutdown_rx, stats).await
         {
             Ok(()) => {
                 return Ok(());
@@ -508,7 +504,6 @@ async fn connect_and_stream(
     subscribe_request: &SubscribeRequest,
     shutdown_rx: &mut watch::Receiver<bool>,
     stats: &mut StreamStats,
-    x_token: Option<&str>,
 ) -> CliResult<()> {
     eprintln!(
         "  {} Connecting to {}...",
@@ -525,17 +520,7 @@ async fn connect_and_stream(
         .await
         .map_err(|e| format!("Connection failed: {}", e))?;
 
-    let token_value: Option<MetadataValue<_>> = x_token
-        .map(|t| t.parse())
-        .transpose()
-        .map_err(|_| "Invalid x-token value")?;
-
-    let mut client = GeyserClient::with_interceptor(channel, move |mut req: tonic::Request<()>| {
-        if let Some(ref val) = token_value {
-            req.metadata_mut().insert("x-token", val.clone());
-        }
-        Ok(req)
-    });
+    let mut client = GeyserClient::new(channel);
 
     let outbound = tokio_stream::iter(vec![subscribe_request.clone()]);
     let response = client
