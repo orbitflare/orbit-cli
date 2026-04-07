@@ -194,6 +194,12 @@ async fn dispatch(cli: Cli) -> CliResult<()> {
         Commands::Template(args) => {
             commands::template::run(args, &config).await
         }
+        Commands::Plan { command } => {
+            commands::plan::run(command, profile).await
+        }
+        Commands::Pay { command } => {
+            commands::pay::run(command, profile).await
+        }
         Commands::Dashboard => {
             commands::dashboard::run().await
         }

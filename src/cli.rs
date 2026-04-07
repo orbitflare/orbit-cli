@@ -87,6 +87,16 @@ pub enum Commands {
     },
     /// Scaffold projects from templates
     Template(TemplateArgs),
+    /// Browse and compare RPC plans
+    Plan {
+        #[command(subcommand)]
+        command: PlanCommands,
+    },
+    /// Payments, top-ups, and plan purchases
+    Pay {
+        #[command(subcommand)]
+        command: PayCommands,
+    },
     /// Real-time TUI dashboard
     Dashboard,
 }
@@ -218,15 +228,10 @@ pub enum RpcCommands {
         #[arg(long)]
         account: Option<String>,
     },
-    /// Execute a raw RPC method
+    /// Execute a raw JSON-RPC request
     Raw {
-        /// RPC method name
-        method: String,
-        /// Positional arguments
-        args: Vec<String>,
-        /// JSON parameters
-        #[arg(long)]
-        params: Option<String>,
+        /// Full JSON-RPC body (e.g. '{"jsonrpc":"2.0","id":1,"method":"getSlot","params":[]}')
+        body: String,
     },
 }
 
@@ -252,5 +257,73 @@ pub struct TemplateArgs {
     /// Target directory for installation
     #[arg(long)]
     pub dir: Option<String>,
+}
+
+
+#[derive(Subcommand)]
+pub enum PayCommands {
+    /// Check account balance
+    CheckBalance,
+    /// Top up account balance with USDC (on-chain)
+    Topup {
+        /// Amount in USDC (min $5)
+        amount: f64,
+        /// Path to Solana wallet keypair file (default: ~/.config/solana/id.json)
+        #[arg(long)]
+        wallet: Option<String>,
+    },
+    /// Top-up and credit transaction history
+    History,
+    /// Purchase an RPC plan using account balance
+    Purchase {
+        /// Plan slug (e.g., solana-rpc-lite)
+        slug: String,
+        /// Billing period (monthly, quarterly, semi-annual, annual)
+        period: String,
+        /// Discount code
+        #[arg(long)]
+        coupon: Option<String>,
+    },
+    /// View order details or order history
+    Order {
+        /// Order reference (e.g., ORD-ABC123)
+        reference: Option<String>,
+        /// List order history
+        #[arg(long)]
+        history: bool,
+    },
+    /// View invoice details or list invoices
+    Invoice {
+        /// Invoice reference to view details
+        reference: Option<String>,
+        /// List all invoices
+        #[arg(long)]
+        list: bool,
+    },
+    /// Pay an invoice from account balance (renewal)
+    Renew {
+        /// Invoice reference
+        invoice: String,
+    },
+}
+
+
+#[derive(Subcommand)]
+pub enum PlanCommands {
+    /// List all available RPC plans
+    List,
+    /// View details of a specific plan
+    View {
+        /// Plan slug (e.g., dev, growth, scale)
+        slug: String,
+    },
+    /// Compare plans side by side
+    Compare {
+        /// Plan slugs to compare (omit for all plans)
+        plans: Vec<String>,
+        /// Compare all available plans
+        #[arg(long)]
+        all: bool,
+    },
 }
 

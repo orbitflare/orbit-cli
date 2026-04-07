@@ -1,6 +1,6 @@
 use crate::error::{CliError, CliResult};
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 const BASE_URL: &str = "https://orbitflare.com/api/customer/v2";
@@ -51,7 +51,7 @@ pub struct ApiKeyData {
     pub key: Option<String>,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct UserData {
     #[serde(default)]
     pub id: Option<u64>,
@@ -69,7 +69,7 @@ pub struct UserData {
     pub created_at: Option<String>,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ProfileData {
     #[serde(default)]
     pub id: Option<u64>,
@@ -89,7 +89,7 @@ pub struct ProfileData {
     pub created_at: Option<String>,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ConnectedAccounts {
     #[serde(default)]
     pub discord: Option<bool>,
@@ -97,7 +97,7 @@ pub struct ConnectedAccounts {
     pub github: Option<bool>,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ApiKeyEntry {
     #[serde(default)]
     pub id: Option<u64>,
@@ -121,13 +121,13 @@ pub struct ApiKeysWrapper {
     pub api_keys: Vec<ApiKeyEntry>,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct LicensesWrapper {
     #[serde(default)]
     pub licenses: Vec<LicenseData>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LicenseData {
     #[serde(default)]
     pub id: Option<u64>,
@@ -147,7 +147,7 @@ pub struct LicenseData {
     pub allowed_locations: Vec<LocationData>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LocationData {
     #[serde(default)]
     pub id: Option<u64>,
@@ -159,7 +159,7 @@ pub struct LocationData {
     pub slots: Option<u32>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LocationUrls {
     #[serde(default)]
     pub rpc: Option<String>,
@@ -173,13 +173,13 @@ pub struct LocationUrls {
     pub tx_sender: Option<String>,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct LicenseDetailWrapper {
     #[serde(default)]
     pub license: Option<LicenseDetailData>,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct LicenseDetailData {
     #[serde(default)]
     pub license_key: Option<String>,
@@ -205,7 +205,7 @@ pub struct LicenseDetailData {
     pub whitelisted_ips: std::collections::HashMap<String, Vec<WhitelistedIp>>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WhitelistedIp {
     #[serde(default)]
     pub ip_address: Option<String>,
@@ -215,7 +215,7 @@ pub struct WhitelistedIp {
     pub expires_at: Option<String>,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct InvoiceData {
     #[serde(default)]
     pub id: Option<u64>,
@@ -229,18 +229,284 @@ pub struct InvoiceData {
     pub created_at: Option<String>,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct PaginatedInvoices {
     #[serde(default)]
     pub data: Vec<InvoiceData>,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct BalanceData {
     #[serde(default)]
     pub balance: Option<f64>,
     #[serde(default)]
     pub currency: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct TopupPrepareData {
+    #[serde(default)]
+    pub transaction: Option<String>,
+    #[serde(default)]
+    pub memo: Option<String>,
+    #[serde(default)]
+    pub amount_usdc: Option<f64>,
+    #[serde(default)]
+    pub amount_micro_usdc: Option<u64>,
+    #[serde(default)]
+    pub destination_wallet: Option<String>,
+    #[serde(default)]
+    pub blockhash: Option<String>,
+    #[serde(default)]
+    pub last_valid_block_height: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct TopupConfirmData {
+    #[serde(default)]
+    pub balance: Option<f64>,
+    #[serde(default)]
+    pub amount_credited: Option<f64>,
+    #[serde(default)]
+    pub invoice_reference: Option<String>,
+    #[serde(default)]
+    pub transaction_signature: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct TopupHistoryData {
+    #[serde(default)]
+    pub transactions: Option<PaginatedTopupTransactions>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct PaginatedTopupTransactions {
+    #[serde(default)]
+    pub data: Vec<TopupTransaction>,
+    #[serde(default)]
+    pub current_page: Option<u64>,
+    #[serde(default)]
+    pub last_page: Option<u64>,
+    #[serde(default)]
+    pub per_page: Option<u64>,
+    #[serde(default)]
+    pub total: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct TopupTransaction {
+    #[serde(default)]
+    pub id: Option<u64>,
+    #[serde(default, rename = "type")]
+    pub tx_type: Option<String>,
+    #[serde(default)]
+    pub amount: Option<f64>,
+    #[serde(default)]
+    pub balance_before: Option<f64>,
+    #[serde(default)]
+    pub balance_after: Option<f64>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub gateway: Option<String>,
+    #[serde(default)]
+    pub created_at: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct RpcPlansWrapper {
+    #[serde(default)]
+    pub plans: Vec<RpcPlan>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct RpcPlan {
+    #[serde(default)]
+    pub id: Option<u64>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub slug: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub features: Vec<String>,
+    #[serde(default, rename = "type")]
+    pub plan_type: Option<String>,
+    #[serde(default)]
+    pub price_type: Option<String>,
+    #[serde(default)]
+    pub pricing: Option<serde_json::Value>,
+    #[serde(default)]
+    pub base_price: Option<serde_json::Value>,
+    #[serde(default)]
+    pub limits: Option<serde_json::Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct OrderValidateData {
+    #[serde(default)]
+    pub product: Option<serde_json::Value>,
+    #[serde(default)]
+    pub billing_period: Option<String>,
+    #[serde(default)]
+    pub pricing: Option<OrderPricing>,
+    #[serde(default)]
+    pub discount: Option<serde_json::Value>,
+    #[serde(default)]
+    pub user_balance: Option<serde_json::Value>,
+    #[serde(default)]
+    pub can_afford: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct OrderPricing {
+    #[serde(default)]
+    pub base_price: Option<serde_json::Value>,
+    #[serde(default)]
+    pub period_months: Option<serde_json::Value>,
+    #[serde(default)]
+    pub period_total: Option<serde_json::Value>,
+    #[serde(default)]
+    pub discount_percent: Option<serde_json::Value>,
+    #[serde(default)]
+    pub discount_amount: Option<serde_json::Value>,
+    #[serde(default)]
+    pub final_price: Option<serde_json::Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct OrderPurchaseData {
+    #[serde(default)]
+    pub order: Option<OrderPurchaseInfo>,
+    #[serde(default)]
+    pub license: Option<OrderLicense>,
+    #[serde(default)]
+    pub invoice: Option<OrderInvoiceRef>,
+    #[serde(default)]
+    pub new_balance: Option<f64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct OrderPurchaseInfo {
+    #[serde(default)]
+    pub reference: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub total_amount: Option<f64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct OrderLicense {
+    #[serde(default)]
+    pub key: Option<String>,
+    #[serde(default)]
+    pub slug: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub renewal_date: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct OrderInvoiceRef {
+    #[serde(default)]
+    pub reference: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct OrdersListData {
+    #[serde(default)]
+    pub orders: Option<PaginatedOrders>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct PaginatedOrders {
+    #[serde(default)]
+    pub data: Vec<OrderListItem>,
+    #[serde(default)]
+    pub current_page: Option<u64>,
+    #[serde(default)]
+    pub last_page: Option<u64>,
+    #[serde(default)]
+    pub per_page: Option<u64>,
+    #[serde(default)]
+    pub total: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct OrderListItem {
+    #[serde(default)]
+    pub reference: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub payment_status: Option<String>,
+    #[serde(default)]
+    pub product_name: Option<String>,
+    #[serde(default)]
+    pub product_slug: Option<String>,
+    #[serde(default)]
+    pub total_amount: Option<f64>,
+    #[serde(default)]
+    pub billing_period: Option<String>,
+    #[serde(default)]
+    pub placed_at: Option<String>,
+    #[serde(default)]
+    pub fulfilled_at: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct OrderDetailData {
+    #[serde(default)]
+    pub reference: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub payment_status: Option<String>,
+    #[serde(default)]
+    pub payment_method: Option<String>,
+    #[serde(default)]
+    pub product: Option<serde_json::Value>,
+    #[serde(default)]
+    pub billing_period: Option<String>,
+    #[serde(default)]
+    pub total_amount: Option<f64>,
+    #[serde(default)]
+    pub pricing_breakdown: Option<serde_json::Value>,
+    #[serde(default)]
+    pub placed_at: Option<String>,
+    #[serde(default)]
+    pub paid_at: Option<String>,
+    #[serde(default)]
+    pub fulfilled_at: Option<String>,
+    #[serde(default)]
+    pub invoice: Option<OrderInvoiceDetail>,
+    #[serde(default)]
+    pub license: Option<OrderLicense>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct OrderInvoiceDetail {
+    #[serde(default)]
+    pub reference: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub billing_total: Option<f64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct PayInvoiceData {
+    #[serde(default)]
+    pub balance_used: Option<f64>,
+    #[serde(default)]
+    pub remainder: Option<f64>,
+    #[serde(default)]
+    pub invoice_status: Option<String>,
+    #[serde(default)]
+    pub new_user_balance: Option<f64>,
 }
 
 pub enum DevicePollResult {
@@ -250,7 +516,7 @@ pub enum DevicePollResult {
     Expired,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct CreatedApiKey {
     #[serde(default)]
     pub id: Option<u64>,
@@ -663,8 +929,84 @@ impl OrbitApi {
     }
 
 
-    pub async fn pay_invoice_with_balance(&self, reference: &str) -> ApiResult<serde_json::Value> {
-        self.post_empty(&format!("/invoices/{}/pay-with-balance", reference)).await
+    pub async fn topup_prepare(&self, amount: f64, wallet_address: &str) -> ApiResult<TopupPrepareData> {
+        let req = self.client
+            .post(format!("{}/topup/prepare", BASE_URL))
+            .json(&serde_json::json!({ "amount": amount, "wallet_address": wallet_address }));
+        let resp = self.auth_header(req).send().await?;
+        self.parse_response::<TopupPrepareData>(resp, "POST /topup/prepare").await
+    }
+
+    pub async fn topup_confirm(&self, transaction: &str, wallet_address: &str, amount: f64) -> ApiResult<TopupConfirmData> {
+        let req = self.client
+            .post(format!("{}/topup/confirm", BASE_URL))
+            .json(&serde_json::json!({ "transaction": transaction, "wallet_address": wallet_address, "amount": amount }));
+        let resp = self.auth_header(req).send().await?;
+        self.parse_response::<TopupConfirmData>(resp, "POST /topup/confirm").await
+    }
+
+    pub async fn topup_history(&self, page: u32, per_page: u32) -> ApiResult<TopupHistoryData> {
+        let req = self.client.get(format!("{}/topup/history?page={}&per_page={}", BASE_URL, page, per_page));
+        let resp = self.auth_header(req).send().await?;
+        self.parse_response::<TopupHistoryData>(resp, "GET /topup/history").await
+    }
+
+    pub async fn rpc_plans(&self) -> ApiResult<Vec<RpcPlan>> {
+        let req = self.client.get(format!("{}/rpc-plans", BASE_URL));
+        let resp = self.auth_header(req).send().await?;
+        let data: RpcPlansWrapper = self.parse_response(resp, "GET /rpc-plans").await?;
+        Ok(data.plans)
+    }
+
+    pub async fn orders_validate(&self, product_slug: &str, billing_period: &str, discount_code: Option<&str>) -> ApiResult<OrderValidateData> {
+        let mut body = serde_json::json!({ "product_slug": product_slug, "billing_period": billing_period });
+        if let Some(code) = discount_code {
+            body["discount_code"] = serde_json::json!(code);
+        }
+        let req = self.client
+            .post(format!("{}/orders/validate", BASE_URL))
+            .json(&body);
+        let resp = self.auth_header(req).send().await?;
+        self.parse_response::<OrderValidateData>(resp, "POST /orders/validate").await
+    }
+
+    pub async fn orders_purchase(&self, product_slug: &str, billing_period: &str, discount_code: Option<&str>) -> ApiResult<OrderPurchaseData> {
+        let mut body = serde_json::json!({ "product_slug": product_slug, "billing_period": billing_period });
+        if let Some(code) = discount_code {
+            body["discount_code"] = serde_json::json!(code);
+        }
+        let req = self.client
+            .post(format!("{}/orders/purchase", BASE_URL))
+            .json(&body);
+        let resp = self.auth_header(req).send().await?;
+        let status = resp.status();
+        let text = resp.text().await?;
+        if !status.is_success() && status.as_u16() != 402 {
+            return Err(format!("POST /orders/purchase — HTTP {}: {}", status.as_u16(), extract_error(&text)).into());
+        }
+        if status.as_u16() == 402 {
+            return Err("Insufficient balance. Top up first with: orbitflare pay topup <amount>".into());
+        }
+        let parsed: ApiResponse<OrderPurchaseData> = serde_json::from_str(&text)?;
+        parsed.data.ok_or_else(|| format!("No data in response: {}", parsed.message.unwrap_or_default()).into())
+    }
+
+    pub async fn orders_list(&self, page: u32, per_page: u32) -> ApiResult<OrdersListData> {
+        let req = self.client.get(format!("{}/orders?page={}&per_page={}", BASE_URL, page, per_page));
+        let resp = self.auth_header(req).send().await?;
+        self.parse_response::<OrdersListData>(resp, "GET /orders").await
+    }
+
+    pub async fn order_detail(&self, reference: &str) -> ApiResult<OrderDetailData> {
+        let req = self.client.get(format!("{}/orders/{}", BASE_URL, reference));
+        let resp = self.auth_header(req).send().await?;
+        self.parse_response::<OrderDetailData>(resp, &format!("GET /orders/{}", reference)).await
+    }
+
+    pub async fn pay_invoice_with_balance(&self, reference: &str) -> ApiResult<PayInvoiceData> {
+        let req = self.client.post(format!("{}/invoices/{}/pay-with-balance", BASE_URL, reference));
+        let resp = self.auth_header(req).send().await?;
+        self.parse_response::<PayInvoiceData>(resp, &format!("POST /invoices/{}/pay-with-balance", reference)).await
     }
 
 
