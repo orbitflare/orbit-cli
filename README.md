@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="OrbitFlare CLI" width="100%"/>
+  <img src="https://raw.githubusercontent.com/orbitflare/orbit-cli/main/assets/banner.png" alt="OrbitFlare CLI" width="100%"/>
 </p>
 
 Real-time gRPC streaming, RPC queries, project scaffolding and account management.
@@ -18,7 +18,7 @@ cd orbit-cli
 cargo install --path .
 ```
 
-Requires Rust 1.83+.
+Requires Rust 1.85+.
 
 ## Quick Start
 
@@ -95,6 +95,16 @@ orbitflare auth status
 | `ping` | Check service connectivity |
 | `ping --service <SVC>` | Ping a specific service (rpc, jetstream, grpc) |
 | `docs [TOPIC...]` | Open docs in browser |
+| `plan list` | List available RPC plans |
+| `plan view <SLUG>` | View plan details |
+| `plan compare --all` | Compare all plans side by side |
+| `pay check-balance` | Check account balance |
+| `pay topup <AMOUNT>` | Top up balance with USDC (on-chain) |
+| `pay history` | Top-up / credit history |
+| `pay purchase <SLUG> <PERIOD>` | Purchase a plan from balance |
+| `pay order --history` | List orders |
+| `pay invoice --list` | List invoices |
+| `pay renew <INVOICE>` | Pay invoice from balance |
 
 ### Streaming & Queries
 
@@ -125,7 +135,7 @@ orbitflare rpc epoch
 orbitflare rpc blockhash
 orbitflare rpc stats
 orbitflare rpc priority-fees --account <ADDR>
-orbitflare rpc raw <METHOD> [ARGS...] --params <JSON>
+orbitflare rpc raw '{"jsonrpc":"2.0","id":1,"method":"getSlot","params":[]}'
 ```
 
 **template** -- Project scaffolding
@@ -138,6 +148,46 @@ orbitflare template --install solana-copy-trader --dir ./my-bot
 ```
 
 Templates are fetched from the configured repo (default: `github.com/orbitflare/templates`).
+
+**plan** -- Browse and compare RPC plans
+
+```bash
+orbitflare plan list
+orbitflare plan view <SLUG>
+orbitflare plan compare --all
+orbitflare plan compare dev growth
+```
+
+Plan data is cached locally for 6 hours.
+
+**pay** -- Payments, top-ups, and plan purchases
+
+```bash
+# Balance
+orbitflare pay check-balance
+
+# Top up with USDC (on-chain)
+orbitflare pay topup <AMOUNT>
+orbitflare pay topup <AMOUNT> --wallet /path/to/keypair.json
+orbitflare pay history
+
+# Purchase a plan (from balance)
+orbitflare pay purchase <SLUG> <PERIOD> --coupon <CODE>
+# period: monthly | quarterly | semi-annual | annual
+
+# Orders
+orbitflare pay order --history
+orbitflare pay order <REFERENCE>
+
+# Invoices
+orbitflare pay invoice --list
+orbitflare pay invoice <REFERENCE>
+
+# Pay invoice from balance (renewal)
+orbitflare pay renew <INVOICE_REF>
+```
+
+Only `topup` requires a wallet keypair (defaults to `~/.config/solana/id.json`). All other pay commands use your account balance.
 
 **dashboard** -- TUI dashboard for account management
 

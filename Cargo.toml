@@ -42,6 +42,7 @@ tokio-stream = "0.1.18"
 serde_yml = "0.0.12"
 shellexpand = "3.1.2"
 
+base64 = "0.22"
 bs58 = "0.5.1"
 ed25519-dalek = { version = "2.1.1", features = ["rand_core"] }
 

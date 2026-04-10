@@ -362,9 +362,6 @@ fn render_profile_bar(frame: &mut Frame, app: &App, area: Rect) {
     let mut spans_line2: Vec<Span> = vec![
         Span::styled("    ", Style::default()),
     ];
-    if app.user_id > 0 {
-        spans_line2.push(Span::styled(format!("ID: {}  ", app.user_id), Style::default().fg(label)));
-    }
     if !app.created_at.is_empty() && app.created_at != "—" {
         spans_line2.push(Span::styled(format!("Member since: {}", app.created_at), Style::default().fg(label)));
     }
@@ -597,13 +594,6 @@ fn render_profile_view(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled("  \u{2502}   ", Style::default().fg(border_dim)),
             Span::styled(format!("{:<20}", "Payment Wallet"), Style::default().fg(label)),
             Span::styled(&app.payment_wallet_address, Style::default().fg(value)),
-        ]));
-    }
-    if app.user_id > 0 {
-        lines.push(Line::from(vec![
-            Span::styled("  \u{2502}   ", Style::default().fg(border_dim)),
-            Span::styled(format!("{:<20}", "User ID"), Style::default().fg(label)),
-            Span::styled(format!("{}", app.user_id), Style::default().fg(value)),
         ]));
     }
     if !app.created_at.is_empty() && app.created_at != "\u{2014}" {

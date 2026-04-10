@@ -26,11 +26,7 @@ pub async fn run(cmd: RpcCommands, rpc: &RpcClient) -> CliResult<()> {
         RpcCommands::Blockhash => blockhash(rpc).await,
         RpcCommands::Stats => stats(rpc).await,
         RpcCommands::PriorityFees { account } => priority_fees(account, rpc).await,
-        RpcCommands::Raw {
-            method,
-            args,
-            params,
-        } => raw(&method, args, params, rpc).await,
+        RpcCommands::Raw { body } => raw(&body, rpc).await,
     }
 }
 
@@ -672,39 +668,24 @@ async fn priority_fees(
     );
     Ok(())
 }
-async fn raw(
-    method: &str,
-    args: Vec<String>,
-    params: Option<String>,
-    rpc: &RpcClient,
-) -> CliResult<()> {
-    let rpc_params = if let Some(ref p) = params {
-        serde_json::from_str(p).map_err(|e| format!("Invalid JSON params: {}", e))?
-    } else if !args.is_empty() {
-        let parsed: Vec<Value> = args
-            .iter()
-            .map(|a| serde_json::from_str(a).unwrap_or(Value::String(a.clone())))
-            .collect();
-        Value::Array(parsed)
-    } else {
-        json!([])
-    };
+async fn raw(body: &str, rpc: &RpcClient) -> CliResult<()> {
+    let parsed: Value = serde_json::from_str(body)
+        .map_err(|e| format!("Invalid JSON: {}", e))?;
 
-    let result = rpc.call(method, rpc_params).await?;
+    let method = parsed["method"]
+        .as_str()
+        .ok_or("Missing \"method\" in JSON body")?;
+    let params = parsed.get("params").cloned().unwrap_or(json!([]));
 
-    if output::is_json() {
+    let result = rpc.call(method, params).await?;
+
+    if output::is_json() || output::is_raw() {
         println!("{}", serde_json::to_string_pretty(&result)?);
-        return Ok(());
-    }
-    if output::is_raw() {
-        println!("{}", result);
         return Ok(());
     }
 
     println!("\n  {} Raw RPC: {}\n", "●".cyan().bold(), method);
-
-    let pretty = serde_json::to_string_pretty(&result)?;
-    println!("{}\n", pretty);
+    println!("{}\n", serde_json::to_string_pretty(&result)?);
 
     Ok(())
 }

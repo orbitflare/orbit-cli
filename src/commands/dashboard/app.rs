@@ -104,7 +104,6 @@ pub struct SidebarItem {
 }
 
 pub struct DashboardData {
-    pub user_id: u64,
     pub user_name: Option<String>,
     pub email: Option<String>,
     pub wallet_address: Option<String>,
@@ -130,7 +129,6 @@ pub struct App {
     pub greeting: String,
     pub user_display: String,
 
-    pub user_id: u64,
     pub email: String,
     pub wallet_address: String,
     pub payment_wallet_address: String,
@@ -227,7 +225,6 @@ impl App {
             greeting,
             user_display,
 
-            user_id: data.user_id,
             email: data.email.unwrap_or_default(),
             wallet_address: data.wallet_address.unwrap_or_default(),
             payment_wallet_address: data.payment_wallet_address.clone().unwrap_or_default(),
