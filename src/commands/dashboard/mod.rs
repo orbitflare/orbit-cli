@@ -60,7 +60,6 @@ async fn fetch_dashboard_data(api: &OrbitApi, api_key: Option<&str>, token: Opti
     let user_name = user.as_ref().and_then(|u| u.name.clone());
     let user_email = user.as_ref().and_then(|u| u.email.clone());
     let user_wallet = user.as_ref().and_then(|u| u.wallet_address.clone());
-    let user_id = user.as_ref().and_then(|u| u.id);
     let payment_wallet = user.as_ref().and_then(|u| u.payment_wallet_address.clone());
     let user_created_at = user.as_ref().and_then(|u| u.created_at.clone());
     let fallback_balance = user.as_ref().and_then(|u| u.balance).unwrap_or(0.0);
@@ -82,7 +81,6 @@ async fn fetch_dashboard_data(api: &OrbitApi, api_key: Option<&str>, token: Opti
     let user_name = profile.as_ref().and_then(|p| p.name.clone()).or(user_name);
     let user_email = profile.as_ref().and_then(|p| p.email.clone()).or(user_email);
     let user_wallet = profile.as_ref().and_then(|p| p.wallet_address.clone()).or(user_wallet);
-    let user_id = profile.as_ref().and_then(|p| p.id).or(user_id);
     let payment_wallet = profile.as_ref().and_then(|p| p.payment_wallet_address.clone()).or(payment_wallet);
     let user_created_at = profile.as_ref().and_then(|p| p.created_at.clone()).or(user_created_at);
     let profile_balance = profile.as_ref().and_then(|p| p.balance);
@@ -197,7 +195,6 @@ async fn fetch_dashboard_data(api: &OrbitApi, api_key: Option<&str>, token: Opti
         .collect();
 
     DashboardData {
-        user_id: user_id.unwrap_or(0),
         user_name,
         email: user_email,
         wallet_address: user_wallet,

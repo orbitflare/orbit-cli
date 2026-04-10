@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="OrbitFlare CLI" width="100%"/>
+  <img src="https://raw.githubusercontent.com/orbitflare/orbit-cli/main/assets/banner.png" alt="OrbitFlare CLI" width="100%"/>
 </p>
 
 Real-time gRPC streaming, RPC queries, project scaffolding and account management.
@@ -18,7 +18,7 @@ cd orbit-cli
 cargo install --path .
 ```
 
-Requires Rust 1.83+.
+Requires Rust 1.85+.
 
 ## Quick Start
 
