@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(
     name = "orbitflare",
-    version = "0.1.0",
+    version = "0.2.0",
     about = "OrbitFlare Developer CLI",
     long_about = "The single entry point for everything a developer needs from OrbitFlare:\n\
                   streaming on-chain data, querying the blockchain, scaffolding projects, and monitoring usage."
