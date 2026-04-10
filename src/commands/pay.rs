@@ -68,9 +68,9 @@ fn load_signing_key(wallet_path: &str) -> CliResult<SigningKey> {
 
 fn sign_transaction(unsigned_tx_base64: &str, signing_key: &SigningKey) -> CliResult<String> {
     use base64::Engine;
-    let engine = base64::engine::general_purpose::STANDARD;
+    let base64_engine = base64::engine::general_purpose::STANDARD;
 
-    let mut tx_bytes = engine
+    let mut tx_bytes = base64_engine
         .decode(unsigned_tx_base64)
         .map_err(|e| format!("Invalid transaction encoding: {}", e))?;
 
@@ -92,7 +92,7 @@ fn sign_transaction(unsigned_tx_base64: &str, signing_key: &SigningKey) -> CliRe
     let signature = signing_key.sign(message);
     tx_bytes[1..65].copy_from_slice(&signature.to_bytes());
 
-    Ok(engine.encode(&tx_bytes))
+    Ok(bs58::encode(tx_bytes).into_string())
 }
 
 fn val_to_f64(value: &Option<serde_json::Value>) -> f64 {
