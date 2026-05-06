@@ -110,7 +110,6 @@ pub enum Commands {
     Dashboard,
 }
 
-
 #[derive(Subcommand)]
 pub enum AuthCommands {
     /// Log in to OrbitFlare
@@ -142,7 +141,6 @@ pub enum AuthCommands {
     },
 }
 
-
 #[derive(Subcommand)]
 pub enum ConfigCommands {
     /// Show all configuration values
@@ -165,7 +163,6 @@ pub enum ConfigCommands {
     Reset,
 }
 
-
 #[derive(clap::Args)]
 pub struct JetArgs {
     /// Path to stream config YAML file
@@ -173,14 +170,12 @@ pub struct JetArgs {
     pub config: String,
 }
 
-
 #[derive(clap::Args)]
 pub struct GrpcArgs {
     /// Path to gRPC stream config YAML file
     #[arg(long)]
     pub config: String,
 }
-
 
 #[derive(Subcommand)]
 pub enum WsCommands {
@@ -203,7 +198,6 @@ pub enum WsCommands {
         signature: String,
     },
 }
-
 
 #[derive(Subcommand)]
 pub enum RpcCommands {
@@ -267,7 +261,6 @@ pub enum RpcCommands {
     },
 }
 
-
 #[derive(clap::Args)]
 pub struct TemplateArgs {
     /// List all available templates
@@ -290,7 +283,6 @@ pub struct TemplateArgs {
     #[arg(long)]
     pub dir: Option<String>,
 }
-
 
 #[derive(Subcommand)]
 pub enum PayCommands {
@@ -339,7 +331,6 @@ pub enum PayCommands {
     },
 }
 
-
 #[derive(Subcommand)]
 pub enum PlanCommands {
     /// List all available RPC plans
@@ -358,4 +349,3 @@ pub enum PlanCommands {
         all: bool,
     },
 }
-

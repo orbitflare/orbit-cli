@@ -48,7 +48,10 @@ fn show() -> CliResult<()> {
     println!();
     println!("  {}", "Endpoints".bold());
     println!("    {:<20} {}", "rpc.url:", config.endpoints.rpc.url);
-    println!("    {:<20} {}", "rpc.devnet_url:", config.endpoints.rpc.devnet_url);
+    println!(
+        "    {:<20} {}",
+        "rpc.devnet_url:", config.endpoints.rpc.devnet_url
+    );
     if !config.endpoints.rpc.fallback_url.is_empty() {
         for (i, fb) in config.endpoints.rpc.fallback_url.iter().enumerate() {
             println!("    {:<20} {}", format!("rpc.fallback[{}]:", i), fb);
@@ -60,28 +63,17 @@ fn show() -> CliResult<()> {
     );
     if !config.endpoints.jetstream.fallback_url.is_empty() {
         for (i, fb) in config.endpoints.jetstream.fallback_url.iter().enumerate() {
-            println!(
-                "    {:<20} {}",
-                format!("jetstream.fallback[{}]:", i),
-                fb
-            );
+            println!("    {:<20} {}", format!("jetstream.fallback[{}]:", i), fb);
         }
     }
-    println!(
-        "    {:<20} {}",
-        "grpc.url:", config.endpoints.grpc.url
-    );
+    println!("    {:<20} {}", "grpc.url:", config.endpoints.grpc.url);
     println!(
         "    {:<20} {}",
         "grpc.devnet_url:", config.endpoints.grpc.devnet_url
     );
     if !config.endpoints.grpc.fallback_url.is_empty() {
         for (i, fb) in config.endpoints.grpc.fallback_url.iter().enumerate() {
-            println!(
-                "    {:<20} {}",
-                format!("grpc.fallback[{}]:", i),
-                fb
-            );
+            println!("    {:<20} {}", format!("grpc.fallback[{}]:", i), fb);
         }
     }
     println!();

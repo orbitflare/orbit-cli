@@ -161,9 +161,8 @@ pub async fn run(
     grpc_override: Option<&str>,
     fallback_overrides: &[String],
 ) -> CliResult<()> {
-    let raw = std::fs::read_to_string(&args.config).map_err(|e| {
-        format!("Failed to read gRPC stream config '{}': {}", args.config, e)
-    })?;
+    let raw = std::fs::read_to_string(&args.config)
+        .map_err(|e| format!("Failed to read gRPC stream config '{}': {}", args.config, e))?;
 
     let expanded = shellexpand::env(&raw)
         .map_err(|e| format!("Failed to expand env vars in stream config: {}", e))?;
@@ -176,7 +175,10 @@ pub async fn run(
         .unwrap_or_else(|| config.endpoints.grpc.url.clone());
 
     if primary.is_empty() {
-        return Err("No gRPC endpoint configured. Set endpoints.grpc.url in ~/.orbitflare/config.yml".into());
+        return Err(
+            "No gRPC endpoint configured. Set endpoints.grpc.url in ~/.orbitflare/config.yml"
+                .into(),
+        );
     }
 
     let mut endpoints = vec![primary];
@@ -310,7 +312,11 @@ fn print_header(endpoints: &[String], config: &StreamConfig) {
         }
     }
 
-    println!("  {} {}", "Commitment:".dimmed(), config.commitment.yellow());
+    println!(
+        "  {} {}",
+        "Commitment:".dimmed(),
+        config.commitment.yellow()
+    );
 
     if !config.transactions.is_empty() {
         let total_accounts: usize = config
@@ -556,10 +562,7 @@ fn print_transaction(
     }
 }
 
-fn print_account(
-    acct: &orbitflare_sdk::proto::geyser::SubscribeUpdateAccount,
-    filters: &[String],
-) {
+fn print_account(acct: &orbitflare_sdk::proto::geyser::SubscribeUpdateAccount, filters: &[String]) {
     let now = chrono::Local::now().format("%H:%M:%S%.3f");
 
     let filter_tag = if filters.is_empty() {
@@ -677,7 +680,11 @@ fn print_summary(stats: &StreamStats) {
     eprintln!("  {} Transactions: {}", "│".dimmed(), stats.tx_count);
     eprintln!("  {} Accounts:     {}", "│".dimmed(), stats.acct_count);
     eprintln!("  {} Slots:        {}", "│".dimmed(), stats.slot_count);
-    eprintln!("  {} Block metas:  {}", "│".dimmed(), stats.block_meta_count);
+    eprintln!(
+        "  {} Block metas:  {}",
+        "│".dimmed(),
+        stats.block_meta_count
+    );
     eprintln!(
         "  {} Highest slot: {}",
         "│".dimmed(),

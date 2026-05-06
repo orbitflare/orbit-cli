@@ -1,7 +1,7 @@
 pub mod auth;
 pub mod config_cmd;
-pub mod docs;
 pub mod dashboard;
+pub mod docs;
 pub mod grpc;
 pub mod jet;
 pub mod pay;

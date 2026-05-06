@@ -6,8 +6,8 @@ use crate::keyring_store;
 use crate::output;
 use colored::Colorize;
 use comfy_table::{
-    modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Cell, Color as TColor,
-    ContentArrangement, Table,
+    Cell, Color as TColor, ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS,
+    presets::UTF8_FULL,
 };
 use std::io::{self, Write};
 
@@ -50,16 +50,10 @@ async fn login_device(profile_name: &str) -> CliResult<()> {
     let device = api.device_code().await?;
 
     println!();
-    println!(
-        "  {} Open this URL in your browser:",
-        "→".cyan().bold()
-    );
+    println!("  {} Open this URL in your browser:", "→".cyan().bold());
     println!("    {}", device.verification_uri.bold());
     println!();
-    println!(
-        "  {} Enter this code when prompted:",
-        "→".cyan().bold()
-    );
+    println!("  {} Enter this code when prompted:", "→".cyan().bold());
     println!("    {}", device.user_code.green().bold());
     println!();
 
@@ -88,7 +82,9 @@ async fn login_device(profile_name: &str) -> CliResult<()> {
                 eprintln!();
 
                 let api_with_token = OrbitApi::new();
-                let user = api_with_token.me_with_token(&token_data.access_token).await
+                let user = api_with_token
+                    .me_with_token(&token_data.access_token)
+                    .await
                     .ok()
                     .or(token_data.user)
                     .unwrap_or_default();
@@ -153,10 +149,7 @@ async fn login_api_key(key: &str, profile_name: &str) -> CliResult<()> {
     Ok(())
 }
 
-async fn login_wallet(
-    keypair_path: &str,
-    profile_name: &str,
-) -> CliResult<()> {
+async fn login_wallet(keypair_path: &str, profile_name: &str) -> CliResult<()> {
     use ed25519_dalek::{Signer, SigningKey};
 
     let api = OrbitApi::new();
@@ -165,8 +158,12 @@ async fn login_wallet(
     let file_contents = std::fs::read_to_string(expanded.as_ref())
         .map_err(|e| format!("Cannot read keypair file '{}': {}", keypair_path, e))?;
 
-    let keypair_bytes: Vec<u8> = serde_json::from_str(&file_contents)
-        .map_err(|e| format!("Invalid keypair format (expected JSON array of bytes): {}", e))?;
+    let keypair_bytes: Vec<u8> = serde_json::from_str(&file_contents).map_err(|e| {
+        format!(
+            "Invalid keypair format (expected JSON array of bytes): {}",
+            e
+        )
+    })?;
 
     if keypair_bytes.len() != 64 {
         return Err(format!(
@@ -365,10 +362,7 @@ async fn status() -> CliResult<()> {
                     .set_content_arrangement(ContentArrangement::Dynamic)
                     .set_header(vec!["Field", "Value"]);
 
-                table.add_row(vec![
-                    Cell::new("Profile"),
-                    Cell::new(&profile_name),
-                ]);
+                table.add_row(vec![Cell::new("Profile"), Cell::new(&profile_name)]);
                 table.add_row(vec![
                     Cell::new("Auth Method"),
                     Cell::new(&profile.auth_method),
@@ -389,22 +383,13 @@ async fn status() -> CliResult<()> {
                     table.add_row(vec![Cell::new("Wallet"), Cell::new(addr)]);
                 }
                 if let Some(ref key) = stored_api_key {
-                    table.add_row(vec![
-                        Cell::new("API Key"),
-                        Cell::new(mask_token(key)),
-                    ]);
+                    table.add_row(vec![Cell::new("API Key"), Cell::new(mask_token(key))]);
                 }
                 if let Some(ref tok) = stored_token {
-                    table.add_row(vec![
-                        Cell::new("Token"),
-                        Cell::new(mask_token(tok)),
-                    ]);
+                    table.add_row(vec![Cell::new("Token"), Cell::new(mask_token(tok))]);
                 }
                 if let Some(ref lk) = stored_license_key {
-                    table.add_row(vec![
-                        Cell::new("License Key"),
-                        Cell::new(mask_token(lk)),
-                    ]);
+                    table.add_row(vec![Cell::new("License Key"), Cell::new(mask_token(lk))]);
                 }
 
                 println!("{table}\n");
@@ -418,7 +403,11 @@ async fn status() -> CliResult<()> {
                 });
                 println!("{}", serde_json::to_string_pretty(&json)?);
             } else {
-                println!("  {} Session expired or invalid: {}", "!".yellow().bold(), e);
+                println!(
+                    "  {} Session expired or invalid: {}",
+                    "!".yellow().bold(),
+                    e
+                );
                 println!("  Run: orbitflare auth login\n");
             }
         }
@@ -459,11 +448,7 @@ fn switch(profile: String) -> CliResult<()> {
 
 fn set_license_key(key: String) -> CliResult<()> {
     let config = Config::load()?;
-    let profile_name = config
-        .auth
-        .default_profile
-        .as_deref()
-        .unwrap_or("default");
+    let profile_name = config.auth.default_profile.as_deref().unwrap_or("default");
 
     keyring_store::store_secret(profile_name, "license_key", &key)?;
     println!(
@@ -504,10 +489,7 @@ async fn fetch_and_store_license_key(api: &OrbitApi, profile_name: &str) {
                         eprintln!(
                             "  {} License key stored ({})",
                             "✓".green(),
-                            license
-                                .product_name
-                                .as_deref()
-                                .unwrap_or("default")
+                            license.product_name.as_deref().unwrap_or("default")
                         );
                     }
                 }

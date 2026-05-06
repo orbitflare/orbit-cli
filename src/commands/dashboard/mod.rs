@@ -6,10 +6,7 @@ mod ui;
 
 use std::time::Duration;
 
-use ratatui::{
-    crossterm::event::KeyEventKind,
-    DefaultTerminal,
-};
+use ratatui::{DefaultTerminal, crossterm::event::KeyEventKind};
 
 use crate::api_client::OrbitApi;
 use crate::config::Config;
@@ -17,7 +14,10 @@ use crate::error::CliResult;
 use crate::keyring_store;
 use app::{App, DashboardData};
 use event::{Event, EventHandler};
-use models::{ApiKeyItem, ConnectedAccountItem, Endpoint, IpEntry, Invoice, InvoiceStatus, Location, Service, ServiceInfo, ServiceStatus};
+use models::{
+    ApiKeyItem, ConnectedAccountItem, Endpoint, Invoice, InvoiceStatus, IpEntry, Location, Service,
+    ServiceInfo, ServiceStatus,
+};
 pub async fn run() -> CliResult<()> {
     eprintln!("  Loading dashboard data...");
 
@@ -34,21 +34,29 @@ pub async fn run() -> CliResult<()> {
     };
     let initial_theme = theme::ThemeName::from_str(&config.preferences.theme);
 
-    let data = fetch_dashboard_data(&api, api_key.as_deref(), token.as_deref(), initial_theme).await;
+    let data =
+        fetch_dashboard_data(&api, api_key.as_deref(), token.as_deref(), initial_theme).await;
 
     let mut terminal = ratatui::init();
     let result = run_loop(&mut terminal, data, &api).await;
     ratatui::restore();
 
     if let Ok(mut cfg) = Config::load() {
-        cfg.preferences.theme = result.as_ref().map_or_else(|_| "ocean".into(), |t| t.label().to_lowercase());
+        cfg.preferences.theme = result
+            .as_ref()
+            .map_or_else(|_| "ocean".into(), |t| t.label().to_lowercase());
         let _ = cfg.save();
     }
 
     result.map(|_| ())
 }
 
-async fn fetch_dashboard_data(api: &OrbitApi, api_key: Option<&str>, token: Option<&str>, initial_theme: theme::ThemeName) -> DashboardData {
+async fn fetch_dashboard_data(
+    api: &OrbitApi,
+    api_key: Option<&str>,
+    token: Option<&str>,
+    initial_theme: theme::ThemeName,
+) -> DashboardData {
     let user = if let Some(key) = api_key {
         api.me_with_api_key(key).await.ok()
     } else if let Some(tok) = token {
@@ -79,18 +87,32 @@ async fn fetch_dashboard_data(api: &OrbitApi, api_key: Option<&str>, token: Opti
     }
 
     let user_name = profile.as_ref().and_then(|p| p.name.clone()).or(user_name);
-    let user_email = profile.as_ref().and_then(|p| p.email.clone()).or(user_email);
-    let user_wallet = profile.as_ref().and_then(|p| p.wallet_address.clone()).or(user_wallet);
-    let payment_wallet = profile.as_ref().and_then(|p| p.payment_wallet_address.clone()).or(payment_wallet);
-    let user_created_at = profile.as_ref().and_then(|p| p.created_at.clone()).or(user_created_at);
+    let user_email = profile
+        .as_ref()
+        .and_then(|p| p.email.clone())
+        .or(user_email);
+    let user_wallet = profile
+        .as_ref()
+        .and_then(|p| p.wallet_address.clone())
+        .or(user_wallet);
+    let payment_wallet = profile
+        .as_ref()
+        .and_then(|p| p.payment_wallet_address.clone())
+        .or(payment_wallet);
+    let user_created_at = profile
+        .as_ref()
+        .and_then(|p| p.created_at.clone())
+        .or(user_created_at);
     let profile_balance = profile.as_ref().and_then(|p| p.balance);
 
     let balance_data = api.balance().await.ok();
-    let balance = balance_data.as_ref()
+    let balance = balance_data
+        .as_ref()
         .and_then(|b| b.balance)
         .or(profile_balance)
         .unwrap_or(fallback_balance);
-    let currency = balance_data.as_ref()
+    let currency = balance_data
+        .as_ref()
         .and_then(|b| b.currency.clone())
         .unwrap_or_else(|| "USD".into());
 
@@ -116,9 +138,11 @@ async fn fetch_dashboard_data(api: &OrbitApi, api_key: Option<&str>, token: Opti
         };
 
         if let Some(d) = detail {
-            let locations: Vec<Location> = d.allowed_locations.iter().map(|loc| {
-                build_location(loc, &d.whitelisted_ips)
-            }).collect();
+            let locations: Vec<Location> = d
+                .allowed_locations
+                .iter()
+                .map(|loc| build_location(loc, &d.whitelisted_ips))
+                .collect();
 
             let detail_key = d.license_key.clone().unwrap_or(license_key.clone());
             let detail_status = match d.status.as_deref() {
@@ -130,7 +154,9 @@ async fn fetch_dashboard_data(api: &OrbitApi, api_key: Option<&str>, token: Opti
 
             services.push(Service {
                 id: lic.id.unwrap_or(0),
-                name: d.product_name.clone().unwrap_or_else(|| lic.product_name.clone().unwrap_or_else(|| "License".into())),
+                name: d.product_name.clone().unwrap_or_else(|| {
+                    lic.product_name.clone().unwrap_or_else(|| "License".into())
+                }),
                 license_key: detail_key,
                 status: detail_status,
                 auth_mode: d.auth_mode.clone().unwrap_or_else(|| "api_key".into()),
@@ -143,9 +169,11 @@ async fn fetch_dashboard_data(api: &OrbitApi, api_key: Option<&str>, token: Opti
             });
         } else {
             let empty_ips = std::collections::HashMap::new();
-            let locations: Vec<Location> = lic.allowed_locations.iter().map(|loc| {
-                build_location(loc, &empty_ips)
-            }).collect();
+            let locations: Vec<Location> = lic
+                .allowed_locations
+                .iter()
+                .map(|loc| build_location(loc, &empty_ips))
+                .collect();
 
             services.push(Service {
                 id: lic.id.unwrap_or(0),
@@ -172,8 +200,14 @@ async fn fetch_dashboard_data(api: &OrbitApi, api_key: Option<&str>, token: Opti
                 _ => InvoiceStatus::Pending,
             };
             Invoice {
-                id: inv.reference.clone().unwrap_or_else(|| format!("#{}", inv.id.unwrap_or(0))),
-                amount: inv.amount.map(|a| format!("${:.2}", a)).unwrap_or_else(|| "—".into()),
+                id: inv
+                    .reference
+                    .clone()
+                    .unwrap_or_else(|| format!("#{}", inv.id.unwrap_or(0))),
+                amount: inv
+                    .amount
+                    .map(|a| format!("${:.2}", a))
+                    .unwrap_or_else(|| "—".into()),
                 date: inv.created_at.clone().unwrap_or_else(|| "—".into()),
                 status,
             }
@@ -217,11 +251,36 @@ fn build_location(
 ) -> Location {
     let mut endpoints = Vec::new();
     if let Some(ref urls) = loc.urls {
-        if let Some(ref u) = urls.rpc { endpoints.push(Endpoint { label: "RPC".into(), url: u.clone() }); }
-        if let Some(ref u) = urls.websocket { endpoints.push(Endpoint { label: "WebSocket".into(), url: u.clone() }); }
-        if let Some(ref u) = urls.yellowstone { endpoints.push(Endpoint { label: "gRPC (Yellowstone)".into(), url: u.clone() }); }
-        if let Some(ref u) = urls.jetstream { endpoints.push(Endpoint { label: "Jetstream".into(), url: u.clone() }); }
-        if let Some(ref u) = urls.tx_sender { endpoints.push(Endpoint { label: "TX Sender".into(), url: u.clone() }); }
+        if let Some(ref u) = urls.rpc {
+            endpoints.push(Endpoint {
+                label: "RPC".into(),
+                url: u.clone(),
+            });
+        }
+        if let Some(ref u) = urls.websocket {
+            endpoints.push(Endpoint {
+                label: "WebSocket".into(),
+                url: u.clone(),
+            });
+        }
+        if let Some(ref u) = urls.yellowstone {
+            endpoints.push(Endpoint {
+                label: "gRPC (Yellowstone)".into(),
+                url: u.clone(),
+            });
+        }
+        if let Some(ref u) = urls.jetstream {
+            endpoints.push(Endpoint {
+                label: "Jetstream".into(),
+                url: u.clone(),
+            });
+        }
+        if let Some(ref u) = urls.tx_sender {
+            endpoints.push(Endpoint {
+                label: "TX Sender".into(),
+                url: u.clone(),
+            });
+        }
     }
 
     let loc_id_num = loc.id.unwrap_or(0);
@@ -229,11 +288,14 @@ fn build_location(
     let ips: Vec<IpEntry> = whitelisted_ips
         .get(&loc_id)
         .map(|ip_list| {
-            ip_list.iter().map(|ip| IpEntry {
-                ip_address: ip.ip_address.clone().unwrap_or_default(),
-                is_rented: ip.is_rented.unwrap_or(false),
-                expires_at: ip.expires_at.clone().unwrap_or_default(),
-            }).collect()
+            ip_list
+                .iter()
+                .map(|ip| IpEntry {
+                    ip_address: ip.ip_address.clone().unwrap_or_default(),
+                    is_rented: ip.is_rented.unwrap_or(false),
+                    expires_at: ip.expires_at.clone().unwrap_or_default(),
+                })
+                .collect()
         })
         .unwrap_or_default();
 
@@ -293,19 +355,28 @@ async fn run_loop(
 }
 
 fn format_created_key(k: &crate::api_client::CreatedApiKey) -> String {
-    let key = k.key.as_deref()
+    let key = k
+        .key
+        .as_deref()
         .or(k.key_masked.as_deref())
         .unwrap_or("(hidden)");
     let name = k.name.as_deref().unwrap_or("Unnamed");
     let id = k.id.map(|i| format!(" #{}", i)).unwrap_or_default();
-    let enabled = if k.enabled.unwrap_or(true) { "enabled" } else { "disabled" };
+    let enabled = if k.enabled.unwrap_or(true) {
+        "enabled"
+    } else {
+        "disabled"
+    };
     let ips = if k.ip_whitelist.is_empty() {
         format!("{} IPs", k.ip_count.unwrap_or(0))
     } else {
         k.ip_whitelist.join(", ")
     };
     let date = k.created_at.as_deref().unwrap_or("—");
-    format!("{}{} — {} ({}, {}, created {})", name, id, key, enabled, ips, date)
+    format!(
+        "{}{} — {} ({}, {}, created {})",
+        name, id, key, enabled, ips, date
+    )
 }
 
 async fn refresh_api_keys(app: &mut App, api: &OrbitApi) {
@@ -338,9 +409,11 @@ async fn refresh_service(app: &mut App, api: &OrbitApi) {
     if let Some(svc) = app.services.get(idx) {
         let license_key = svc.license_key.clone();
         if let Ok(Some(d)) = api.license_detail(&license_key).await {
-            let locations: Vec<Location> = d.allowed_locations.iter().map(|loc| {
-                build_location(loc, &d.whitelisted_ips)
-            }).collect();
+            let locations: Vec<Location> = d
+                .allowed_locations
+                .iter()
+                .map(|loc| build_location(loc, &d.whitelisted_ips))
+                .collect();
 
             let status = match d.status.as_deref() {
                 Some("active") => ServiceStatus::Active,
@@ -372,19 +445,20 @@ async fn execute_action(app: &mut App, api: &OrbitApi, action: app::Action) {
         app::Action::RefreshApiKeys => {
             refresh_api_keys(app, api).await;
         }
-        app::Action::CreateApiKey { name } => {
-            match api.create_api_key(&name).await {
-                Ok(created) => {
-                    let key_str = format_created_key(&created);
-                    app.set_status(format!("Created: {}", key_str), false);
-                    refresh_api_keys(app, api).await;
-                }
-                Err(e) => {
-                    app.set_status(format!("Failed to create: {}", e), true);
-                }
+        app::Action::CreateApiKey { name } => match api.create_api_key(&name).await {
+            Ok(created) => {
+                let key_str = format_created_key(&created);
+                app.set_status(format!("Created: {}", key_str), false);
+                refresh_api_keys(app, api).await;
             }
-        }
-        app::Action::ToggleApiKeyEnabled { id, currently_enabled } => {
+            Err(e) => {
+                app.set_status(format!("Failed to create: {}", e), true);
+            }
+        },
+        app::Action::ToggleApiKeyEnabled {
+            id,
+            currently_enabled,
+        } => {
             let new_enabled = !currently_enabled;
             match api.update_api_key(id, None, Some(new_enabled)).await {
                 Ok(_) => {
@@ -397,72 +471,72 @@ async fn execute_action(app: &mut App, api: &OrbitApi, action: app::Action) {
                 }
             }
         }
-        app::Action::RegenerateApiKey { id } => {
-            match api.regenerate_api_key(id).await {
-                Ok(created) => {
-                    let key_str = format_created_key(&created);
-                    app.set_status(format!("Regenerated: {}", key_str), false);
-                    refresh_api_keys(app, api).await;
-                }
-                Err(e) => {
-                    app.set_status(format!("Failed to regenerate: {}", e), true);
+        app::Action::RegenerateApiKey { id } => match api.regenerate_api_key(id).await {
+            Ok(created) => {
+                let key_str = format_created_key(&created);
+                app.set_status(format!("Regenerated: {}", key_str), false);
+                refresh_api_keys(app, api).await;
+            }
+            Err(e) => {
+                app.set_status(format!("Failed to regenerate: {}", e), true);
+            }
+        },
+        app::Action::DeleteApiKey { id } => match api.delete_api_key(id).await {
+            Ok(_) => {
+                app.api_keys_expanded = None;
+                app.set_status("API key deleted".into(), false);
+                refresh_api_keys(app, api).await;
+            }
+            Err(e) => {
+                app.set_status(format!("Failed to delete: {}", e), true);
+            }
+        },
+        app::Action::AddApiKeyIp { id, ip } => match api.api_key_add_ip(id, &ip).await {
+            Ok(_) => {
+                app.set_status(format!("IP {} added", ip), false);
+                refresh_api_keys(app, api).await;
+            }
+            Err(e) => {
+                app.set_status(format!("Failed to add IP: {}", e), true);
+            }
+        },
+        app::Action::RemoveApiKeyIp { id, ip } => match api.api_key_remove_ip(id, &ip).await {
+            Ok(_) => {
+                app.set_status(format!("IP {} removed", ip), false);
+                refresh_api_keys(app, api).await;
+                if let Some(exp_idx) = app.api_keys_expanded
+                    && let Some(key_item) = app.api_keys.get(exp_idx)
+                    && app.api_keys_ip_selected >= key_item.ip_whitelist.len()
+                    && !key_item.ip_whitelist.is_empty()
+                {
+                    app.api_keys_ip_selected = key_item.ip_whitelist.len() - 1;
                 }
             }
-        }
-        app::Action::DeleteApiKey { id } => {
-            match api.delete_api_key(id).await {
-                Ok(_) => {
-                    app.api_keys_expanded = None;
-                    app.set_status("API key deleted".into(), false);
-                    refresh_api_keys(app, api).await;
-                }
-                Err(e) => {
-                    app.set_status(format!("Failed to delete: {}", e), true);
-                }
+            Err(e) => {
+                app.set_status(format!("Failed to remove IP: {}", e), true);
             }
-        }
-        app::Action::AddApiKeyIp { id, ip } => {
-            match api.api_key_add_ip(id, &ip).await {
-                Ok(_) => {
-                    app.set_status(format!("IP {} added", ip), false);
-                    refresh_api_keys(app, api).await;
-                }
-                Err(e) => {
-                    app.set_status(format!("Failed to add IP: {}", e), true);
-                }
-            }
-        }
-        app::Action::RemoveApiKeyIp { id, ip } => {
-            match api.api_key_remove_ip(id, &ip).await {
-                Ok(_) => {
-                    app.set_status(format!("IP {} removed", ip), false);
-                    refresh_api_keys(app, api).await;
-                    if let Some(exp_idx) = app.api_keys_expanded
-                        && let Some(key_item) = app.api_keys.get(exp_idx)
-                        && app.api_keys_ip_selected >= key_item.ip_whitelist.len()
-                        && !key_item.ip_whitelist.is_empty()
-                    {
-                        app.api_keys_ip_selected = key_item.ip_whitelist.len() - 1;
-                    }
-                }
-                Err(e) => {
-                    app.set_status(format!("Failed to remove IP: {}", e), true);
-                }
-            }
-        }
+        },
         app::Action::RefreshService => {
             refresh_service(app, api).await;
             app.set_status("Service refreshed".into(), false);
         }
         app::Action::ToggleLicenseAuthMode { license_key } => {
-            let current = app.services.get(app.services_selected)
+            let current = app
+                .services
+                .get(app.services_selected)
                 .map(|s| s.auth_mode.as_str())
                 .unwrap_or("ip_whitelist");
-            let new_mode = if current == "api_key" { "ip_whitelist" } else { "api_key" };
+            let new_mode = if current == "api_key" {
+                "ip_whitelist"
+            } else {
+                "api_key"
+            };
             match api.license_toggle_auth_mode(&license_key, new_mode).await {
                 Ok(_) => {
                     refresh_service(app, api).await;
-                    let mode = app.services.get(app.services_selected)
+                    let mode = app
+                        .services
+                        .get(app.services_selected)
                         .map(|s| s.auth_mode.as_str())
                         .unwrap_or("unknown");
                     app.set_status(format!("Auth mode: {}", mode), false);
@@ -483,41 +557,47 @@ async fn execute_action(app: &mut App, api: &OrbitApi, action: app::Action) {
                 }
             }
         }
-        app::Action::AddLicenseIp { license_key, ip, location_id } => {
-            match api.license_add_ip(&license_key, &ip, location_id).await {
-                Ok(_) => {
-                    app.set_status(format!("IP {} added", ip), false);
-                    refresh_service(app, api).await;
-                }
-                Err(e) => {
-                    app.set_status(format!("Failed to add IP: {}", e), true);
+        app::Action::AddLicenseIp {
+            license_key,
+            ip,
+            location_id,
+        } => match api.license_add_ip(&license_key, &ip, location_id).await {
+            Ok(_) => {
+                app.set_status(format!("IP {} added", ip), false);
+                refresh_service(app, api).await;
+            }
+            Err(e) => {
+                app.set_status(format!("Failed to add IP: {}", e), true);
+            }
+        },
+        app::Action::RemoveLicenseIp {
+            license_key,
+            ip,
+            location_id,
+        } => match api.license_remove_ip(&license_key, &ip, location_id).await {
+            Ok(_) => {
+                app.set_status(format!("IP {} removed", ip), false);
+                refresh_service(app, api).await;
+                if let Some(loc_idx) = app.detail_location_expanded
+                    && let Some(svc) = app.services.get(app.services_selected)
+                    && let Some(loc) = svc.locations.get(loc_idx)
+                    && app.detail_ip_selected >= loc.ips.len()
+                    && !loc.ips.is_empty()
+                {
+                    app.detail_ip_selected = loc.ips.len() - 1;
                 }
             }
-        }
-        app::Action::RemoveLicenseIp { license_key, ip, location_id } => {
-            match api.license_remove_ip(&license_key, &ip, location_id).await {
-                Ok(_) => {
-                    app.set_status(format!("IP {} removed", ip), false);
-                    refresh_service(app, api).await;
-                    if let Some(loc_idx) = app.detail_location_expanded
-                        && let Some(svc) = app.services.get(app.services_selected)
-                        && let Some(loc) = svc.locations.get(loc_idx)
-                        && app.detail_ip_selected >= loc.ips.len()
-                        && !loc.ips.is_empty()
-                    {
-                        app.detail_ip_selected = loc.ips.len() - 1;
-                    }
-                }
-                Err(e) => {
-                    app.set_status(format!("Failed to remove IP: {}", e), true);
-                }
+            Err(e) => {
+                app.set_status(format!("Failed to remove IP: {}", e), true);
             }
-        }
+        },
         app::Action::ToggleAutoRenewal { license_key } => {
             match api.license_toggle_auto_renewal(&license_key).await {
                 Ok(_) => {
                     refresh_service(app, api).await;
-                    let enabled = app.services.get(app.services_selected)
+                    let enabled = app
+                        .services
+                        .get(app.services_selected)
                         .map(|s| s.auto_renew)
                         .unwrap_or(false);
                     let label = if enabled { "enabled" } else { "disabled" };
@@ -528,47 +608,56 @@ async fn execute_action(app: &mut App, api: &OrbitApi, action: app::Action) {
                 }
             }
         }
-        app::Action::AddDomain { license_key, domain } => {
-            match api.license_add_domain(&license_key, &domain).await {
-                Ok(_) => {
-                    app.set_status(format!("Domain {} added", domain), false);
-                    refresh_service(app, api).await;
-                }
-                Err(e) => {
-                    app.set_status(format!("Failed to add domain: {}", e), true);
+        app::Action::AddDomain {
+            license_key,
+            domain,
+        } => match api.license_add_domain(&license_key, &domain).await {
+            Ok(_) => {
+                app.set_status(format!("Domain {} added", domain), false);
+                refresh_service(app, api).await;
+            }
+            Err(e) => {
+                app.set_status(format!("Failed to add domain: {}", e), true);
+            }
+        },
+        app::Action::RemoveDomain {
+            license_key,
+            domain,
+        } => match api.license_remove_domain(&license_key, &domain).await {
+            Ok(_) => {
+                app.set_status(format!("Domain {} removed", domain), false);
+                refresh_service(app, api).await;
+                if let Some(svc) = app.services.get(app.services_selected)
+                    && app.detail_domain_selected >= svc.allowed_domains.len()
+                    && !svc.allowed_domains.is_empty()
+                {
+                    app.detail_domain_selected = svc.allowed_domains.len() - 1;
                 }
             }
-        }
-        app::Action::RemoveDomain { license_key, domain } => {
-            match api.license_remove_domain(&license_key, &domain).await {
-                Ok(_) => {
-                    app.set_status(format!("Domain {} removed", domain), false);
-                    refresh_service(app, api).await;
-                    if let Some(svc) = app.services.get(app.services_selected)
-                        && app.detail_domain_selected >= svc.allowed_domains.len()
-                        && !svc.allowed_domains.is_empty()
-                    {
-                        app.detail_domain_selected = svc.allowed_domains.len() - 1;
-                    }
-                }
-                Err(e) => {
-                    app.set_status(format!("Failed to remove domain: {}", e), true);
-                }
+            Err(e) => {
+                app.set_status(format!("Failed to remove domain: {}", e), true);
             }
-        }
-        app::Action::AddDevnetDomain { license_key, domain } => {
-            match api.license_add_devnet_domain(&license_key, &domain).await {
-                Ok(_) => {
-                    app.set_status(format!("Devnet domain {} added", domain), false);
-                    refresh_service(app, api).await;
-                }
-                Err(e) => {
-                    app.set_status(format!("Failed to add devnet domain: {}", e), true);
-                }
+        },
+        app::Action::AddDevnetDomain {
+            license_key,
+            domain,
+        } => match api.license_add_devnet_domain(&license_key, &domain).await {
+            Ok(_) => {
+                app.set_status(format!("Devnet domain {} added", domain), false);
+                refresh_service(app, api).await;
             }
-        }
-        app::Action::RemoveDevnetDomain { license_key, domain } => {
-            match api.license_remove_devnet_domain(&license_key, &domain).await {
+            Err(e) => {
+                app.set_status(format!("Failed to add devnet domain: {}", e), true);
+            }
+        },
+        app::Action::RemoveDevnetDomain {
+            license_key,
+            domain,
+        } => {
+            match api
+                .license_remove_devnet_domain(&license_key, &domain)
+                .await
+            {
                 Ok(_) => {
                     app.set_status(format!("Devnet domain {} removed", domain), false);
                     refresh_service(app, api).await;
@@ -594,8 +683,14 @@ async fn execute_action(app: &mut App, api: &OrbitApi, action: app::Action) {
                         _ => InvoiceStatus::Pending,
                     };
                     Invoice {
-                        id: inv.reference.clone().unwrap_or_else(|| format!("#{}", inv.id.unwrap_or(0))),
-                        amount: inv.amount.map(|a| format!("${:.2}", a)).unwrap_or_else(|| "—".into()),
+                        id: inv
+                            .reference
+                            .clone()
+                            .unwrap_or_else(|| format!("#{}", inv.id.unwrap_or(0))),
+                        amount: inv
+                            .amount
+                            .map(|a| format!("${:.2}", a))
+                            .unwrap_or_else(|| "—".into()),
                         date: inv.created_at.clone().unwrap_or_else(|| "—".into()),
                         status,
                     }

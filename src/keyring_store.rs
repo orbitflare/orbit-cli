@@ -41,11 +41,7 @@ pub fn delete_profile_secrets(profile: &str) -> CliResult<()> {
     Ok(())
 }
 
-pub fn store_profile_secrets(
-    profile: &str,
-    api_key: Option<&str>,
-    token: &str,
-) -> CliResult<()> {
+pub fn store_profile_secrets(profile: &str, api_key: Option<&str>, token: &str) -> CliResult<()> {
     store_secret(profile, "token", token)?;
     store_secret(profile, "api_key", api_key.unwrap_or(""))?;
     Ok(())

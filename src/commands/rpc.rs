@@ -2,12 +2,12 @@ use crate::cli::RpcCommands;
 use crate::error::CliResult;
 use crate::output;
 use colored::Colorize;
-use orbitflare_sdk::RpcClient;
 use comfy_table::{
-    modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Cell, Color as TColor,
-    ContentArrangement, Table,
+    Cell, Color as TColor, ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS,
+    presets::UTF8_FULL,
 };
-use serde_json::{json, Value};
+use orbitflare_sdk::RpcClient;
+use serde_json::{Value, json};
 
 pub async fn run(cmd: RpcCommands, rpc: &RpcClient) -> CliResult<()> {
     match cmd {
@@ -78,14 +78,20 @@ async fn account(address: &str, rpc: &RpcClient) -> CliResult<()> {
 
     let mut table = new_table();
     table.set_header(vec!["Field", "Value"]);
-    table.add_row(vec![Cell::new("Address"), Cell::new(address).fg(TColor::Cyan)]);
+    table.add_row(vec![
+        Cell::new("Address"),
+        Cell::new(address).fg(TColor::Cyan),
+    ]);
     table.add_row(vec![Cell::new("Owner"), Cell::new(owner)]);
     table.add_row(vec![
         Cell::new("Lamports"),
         Cell::new(format!("{} ({:.9} SOL)", format_number(lamports), sol)),
     ]);
     table.add_row(vec![Cell::new("Executable"), Cell::new(executable)]);
-    table.add_row(vec![Cell::new("Data Size"), Cell::new(format!("{} bytes", space))]);
+    table.add_row(vec![
+        Cell::new("Data Size"),
+        Cell::new(format!("{} bytes", space)),
+    ]);
 
     println!("{table}\n");
     Ok(())
@@ -119,7 +125,11 @@ async fn tokens(wallet: &str, rpc: &RpcClient) -> CliResult<()> {
         return Ok(());
     }
 
-    println!("\n  {} Token Accounts for {}\n", "●".cyan().bold(), truncate_addr(wallet));
+    println!(
+        "\n  {} Token Accounts for {}\n",
+        "●".cyan().bold(),
+        truncate_addr(wallet)
+    );
 
     let mut table = new_table();
     table.set_header(vec!["#", "Mint", "Balance", "Decimals"]);
@@ -141,7 +151,11 @@ async fn tokens(wallet: &str, rpc: &RpcClient) -> CliResult<()> {
     }
 
     println!("{table}");
-    println!("\n  {} {} token account(s)\n", "✓".green().bold(), accounts.len());
+    println!(
+        "\n  {} {} token account(s)\n",
+        "✓".green().bold(),
+        accounts.len()
+    );
     Ok(())
 }
 async fn balance(address: &str, rpc: &RpcClient) -> CliResult<()> {
@@ -226,12 +240,24 @@ async fn tx(signature: &str, rpc: &RpcClient) -> CliResult<()> {
 
     let mut table = new_table();
     table.set_header(vec!["Field", "Value"]);
-    table.add_row(vec![Cell::new("Signature"), Cell::new(signature).fg(TColor::Cyan)]);
-    table.add_row(vec![Cell::new("Status"), Cell::new(&status_text).fg(status_color)]);
+    table.add_row(vec![
+        Cell::new("Signature"),
+        Cell::new(signature).fg(TColor::Cyan),
+    ]);
+    table.add_row(vec![
+        Cell::new("Status"),
+        Cell::new(&status_text).fg(status_color),
+    ]);
     table.add_row(vec![Cell::new("Slot"), Cell::new(format_number(slot))]);
     table.add_row(vec![Cell::new("Block Time"), Cell::new(&time_str)]);
-    table.add_row(vec![Cell::new("Fee"), Cell::new(format!("{} SOL", fee as f64 / 1_000_000_000.0))]);
-    table.add_row(vec![Cell::new("Compute"), Cell::new(format!("{} CU", format_number(compute)))]);
+    table.add_row(vec![
+        Cell::new("Fee"),
+        Cell::new(format!("{} SOL", fee as f64 / 1_000_000_000.0)),
+    ]);
+    table.add_row(vec![
+        Cell::new("Compute"),
+        Cell::new(format!("{} CU", format_number(compute))),
+    ]);
 
     if let Some(keys) = result["transaction"]["message"]["accountKeys"].as_array() {
         let signers: Vec<&str> = keys
@@ -273,11 +299,7 @@ async fn tx(signature: &str, rpc: &RpcClient) -> CliResult<()> {
     println!();
     Ok(())
 }
-async fn history(
-    wallet: &str,
-    limit: u32,
-    rpc: &RpcClient,
-) -> CliResult<()> {
+async fn history(wallet: &str, limit: u32, rpc: &RpcClient) -> CliResult<()> {
     let result = rpc
         .request(
             "getSignaturesForAddress",
@@ -445,10 +467,7 @@ async fn slot(rpc: &RpcClient) -> CliResult<()> {
 }
 async fn epoch(rpc: &RpcClient) -> CliResult<()> {
     let result = rpc
-        .request(
-            "getEpochInfo",
-            json!([{"commitment": rpc.commitment()}]),
-        )
+        .request("getEpochInfo", json!([{"commitment": rpc.commitment()}]))
         .await?;
 
     if output::is_json() {
@@ -478,16 +497,31 @@ async fn epoch(rpc: &RpcClient) -> CliResult<()> {
 
     let mut table = new_table();
     table.set_header(vec!["Field", "Value"]);
-    table.add_row(vec![Cell::new("Epoch"), Cell::new(format_number(epoch_num)).fg(TColor::Green)]);
+    table.add_row(vec![
+        Cell::new("Epoch"),
+        Cell::new(format_number(epoch_num)).fg(TColor::Green),
+    ]);
     table.add_row(vec![
         Cell::new("Slot Range"),
-        Cell::new(format!("{} — {}", format_number(epoch_start), format_number(epoch_end))),
+        Cell::new(format!(
+            "{} — {}",
+            format_number(epoch_start),
+            format_number(epoch_end)
+        )),
     ]);
     table.add_row(vec![
         Cell::new("Progress"),
-        Cell::new(format!("{:.1}% ({} / {} slots)", progress, format_number(slot_index), format_number(slots_in_epoch))),
+        Cell::new(format!(
+            "{:.1}% ({} / {} slots)",
+            progress,
+            format_number(slot_index),
+            format_number(slots_in_epoch)
+        )),
     ]);
-    table.add_row(vec![Cell::new("Time Left"), Cell::new(format!("~{}h {}m", hours, mins))]);
+    table.add_row(vec![
+        Cell::new("Time Left"),
+        Cell::new(format!("~{}h {}m", hours, mins)),
+    ]);
 
     println!("{table}\n");
     Ok(())
@@ -509,9 +543,7 @@ async fn blockhash(rpc: &RpcClient) -> CliResult<()> {
         return Ok(());
     }
 
-    let hash = result["value"]["blockhash"]
-        .as_str()
-        .unwrap_or("unknown");
+    let hash = result["value"]["blockhash"].as_str().unwrap_or("unknown");
     let last_valid = result["value"]["lastValidBlockHeight"]
         .as_u64()
         .unwrap_or(0);
@@ -521,7 +553,10 @@ async fn blockhash(rpc: &RpcClient) -> CliResult<()> {
     let mut table = new_table();
     table.set_header(vec!["Field", "Value"]);
     table.add_row(vec![Cell::new("Hash"), Cell::new(hash).fg(TColor::Cyan)]);
-    table.add_row(vec![Cell::new("Last Valid Height"), Cell::new(format_number(last_valid))]);
+    table.add_row(vec![
+        Cell::new("Last Valid Height"),
+        Cell::new(format_number(last_valid)),
+    ]);
 
     println!("{table}\n");
     Ok(())
@@ -545,18 +580,24 @@ async fn stats(rpc: &RpcClient) -> CliResult<()> {
 
     let samples = perf.as_array();
     let (current_tps, avg_tps) = if let Some(samples) = samples {
-        let current = samples.first().map(|s| {
-            let txs = s["numTransactions"].as_u64().unwrap_or(0);
-            let secs = s["samplePeriodSecs"].as_u64().unwrap_or(60);
-            if secs > 0 { txs / secs } else { 0 }
-        }).unwrap_or(0);
-
-        let avg = if !samples.is_empty() {
-            let total: u64 = samples.iter().map(|s| {
+        let current = samples
+            .first()
+            .map(|s| {
                 let txs = s["numTransactions"].as_u64().unwrap_or(0);
                 let secs = s["samplePeriodSecs"].as_u64().unwrap_or(60);
                 if secs > 0 { txs / secs } else { 0 }
-            }).sum();
+            })
+            .unwrap_or(0);
+
+        let avg = if !samples.is_empty() {
+            let total: u64 = samples
+                .iter()
+                .map(|s| {
+                    let txs = s["numTransactions"].as_u64().unwrap_or(0);
+                    let secs = s["samplePeriodSecs"].as_u64().unwrap_or(60);
+                    if secs > 0 { txs / secs } else { 0 }
+                })
+                .sum();
             total / samples.len() as u64
         } else {
             0
@@ -594,16 +635,17 @@ async fn stats(rpc: &RpcClient) -> CliResult<()> {
     ]);
     table.add_row(vec![
         Cell::new("Delinquent"),
-        Cell::new(delinquent).fg(if delinquent > 0 { TColor::Yellow } else { TColor::Green }),
+        Cell::new(delinquent).fg(if delinquent > 0 {
+            TColor::Yellow
+        } else {
+            TColor::Green
+        }),
     ]);
 
     println!("{table}\n");
     Ok(())
 }
-async fn priority_fees(
-    account: Option<String>,
-    rpc: &RpcClient,
-) -> CliResult<()> {
+async fn priority_fees(account: Option<String>, rpc: &RpcClient) -> CliResult<()> {
     let params = if let Some(ref addr) = account {
         json!([[addr]])
     } else {
@@ -624,7 +666,11 @@ async fn priority_fees(
     let fees = result.as_array().ok_or("Invalid response")?;
 
     if let Some(ref addr) = account {
-        println!("\n  {} Priority Fees for {}\n", "●".cyan().bold(), truncate_addr(addr));
+        println!(
+            "\n  {} Priority Fees for {}\n",
+            "●".cyan().bold(),
+            truncate_addr(addr)
+        );
     } else {
         println!("\n  {} Priority Fees (global)\n", "●".cyan().bold());
     }
@@ -654,10 +700,22 @@ async fn priority_fees(
 
     let mut table = new_table();
     table.set_header(vec!["Percentile", "Fee (microlamports/CU)"]);
-    table.add_row(vec![Cell::new("25th"), Cell::new(format_number(percentile(25)))]);
-    table.add_row(vec![Cell::new("50th"), Cell::new(format_number(percentile(50)))]);
-    table.add_row(vec![Cell::new("75th"), Cell::new(format_number(percentile(75)))]);
-    table.add_row(vec![Cell::new("95th"), Cell::new(format_number(percentile(95))).fg(TColor::Yellow)]);
+    table.add_row(vec![
+        Cell::new("25th"),
+        Cell::new(format_number(percentile(25))),
+    ]);
+    table.add_row(vec![
+        Cell::new("50th"),
+        Cell::new(format_number(percentile(50))),
+    ]);
+    table.add_row(vec![
+        Cell::new("75th"),
+        Cell::new(format_number(percentile(75))),
+    ]);
+    table.add_row(vec![
+        Cell::new("95th"),
+        Cell::new(format_number(percentile(95))).fg(TColor::Yellow),
+    ]);
 
     println!("{table}");
     println!(
@@ -669,8 +727,7 @@ async fn priority_fees(
     Ok(())
 }
 async fn raw(body: &str, rpc: &RpcClient) -> CliResult<()> {
-    let parsed: Value = serde_json::from_str(body)
-        .map_err(|e| format!("Invalid JSON: {}", e))?;
+    let parsed: Value = serde_json::from_str(body).map_err(|e| format!("Invalid JSON: {}", e))?;
 
     let method = parsed["method"]
         .as_str()

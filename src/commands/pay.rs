@@ -5,8 +5,8 @@ use crate::keyring_store;
 use crate::output;
 use colored::Colorize;
 use comfy_table::{
-    modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Cell, Color as TColor,
-    ContentArrangement, Table,
+    Cell, Color as TColor, ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS,
+    presets::UTF8_FULL,
 };
 use ed25519_dalek::{Signer, SigningKey};
 use std::io::{self, Write};
@@ -18,9 +18,11 @@ pub async fn run(cmd: PayCommands, profile: Option<&str>) -> CliResult<()> {
         PayCommands::CheckBalance => check_balance(profile).await,
         PayCommands::Topup { amount, wallet } => topup(amount, wallet.as_deref(), profile).await,
         PayCommands::History => history(profile).await,
-        PayCommands::Purchase { slug, period, coupon } => {
-            purchase(&slug, &period, coupon.as_deref(), profile).await
-        }
+        PayCommands::Purchase {
+            slug,
+            period,
+            coupon,
+        } => purchase(&slug, &period, coupon.as_deref(), profile).await,
         PayCommands::Order { reference, history } => {
             order(reference.as_deref(), history, profile).await
         }
@@ -30,7 +32,6 @@ pub async fn run(cmd: PayCommands, profile: Option<&str>) -> CliResult<()> {
         PayCommands::Renew { invoice } => renew(&invoice, profile).await,
     }
 }
-
 
 fn get_api(profile: Option<&str>) -> CliResult<OrbitApi> {
     let profile_name = profile.unwrap_or("default");
@@ -48,8 +49,12 @@ fn load_signing_key(wallet_path: &str) -> CliResult<SigningKey> {
     let file_contents = std::fs::read_to_string(expanded.as_ref())
         .map_err(|e| format!("Cannot read keypair file '{}': {}", wallet_path, e))?;
 
-    let keypair_bytes: Vec<u8> = serde_json::from_str(&file_contents)
-        .map_err(|e| format!("Invalid keypair format (expected JSON array of bytes): {}", e))?;
+    let keypair_bytes: Vec<u8> = serde_json::from_str(&file_contents).map_err(|e| {
+        format!(
+            "Invalid keypair format (expected JSON array of bytes): {}",
+            e
+        )
+    })?;
 
     if keypair_bytes.len() != 64 {
         return Err(format!(
@@ -116,7 +121,6 @@ fn confirm_prompt(question: &str) -> CliResult<bool> {
     Ok(answer == "y" || answer == "yes")
 }
 
-
 async fn check_balance(profile: Option<&str>) -> CliResult<()> {
     let api = get_api(profile)?;
 
@@ -145,7 +149,6 @@ async fn check_balance(profile: Option<&str>) -> CliResult<()> {
 
     Ok(())
 }
-
 
 async fn topup(amount: f64, wallet_path: Option<&str>, profile: Option<&str>) -> CliResult<()> {
     if amount < 5.0 {
@@ -211,10 +214,7 @@ async fn topup(amount: f64, wallet_path: Option<&str>, profile: Option<&str>) ->
                 .green()
                 .bold()
         );
-        println!(
-            "  Balance:   ${:.2}",
-            result.balance.unwrap_or(0.0)
-        );
+        println!("  Balance:   ${:.2}", result.balance.unwrap_or(0.0));
         if let Some(ref sig) = result.transaction_signature {
             println!(
                 "  TX:        {}",
@@ -226,7 +226,6 @@ async fn topup(amount: f64, wallet_path: Option<&str>, profile: Option<&str>) ->
 
     Ok(())
 }
-
 
 async fn history(profile: Option<&str>) -> CliResult<()> {
     let api = get_api(profile)?;
@@ -281,7 +280,6 @@ async fn history(profile: Option<&str>) -> CliResult<()> {
     Ok(())
 }
 
-
 async fn purchase(
     slug: &str,
     period: &str,
@@ -316,7 +314,9 @@ async fn purchase(
             "shortfall": final_price - user_balance,
         });
         println!("{}", serde_json::to_string_pretty(&json)?);
-        return Err("Insufficient balance. Top up first with: orbitflare pay topup <amount>".into());
+        return Err(
+            "Insufficient balance. Top up first with: orbitflare pay topup <amount>".into(),
+        );
     }
 
     if !output::is_json() {
@@ -331,20 +331,14 @@ async fn purchase(
             println!("  Period total:   {}", format_price(&p.period_total));
             let disc = val_to_f64(&p.discount_amount);
             if disc > 0.0 {
-                println!(
-                    "  Discount:       {}",
-                    format!("-${:.2}", disc).green()
-                );
+                println!("  Discount:       {}", format!("-${:.2}", disc).green());
             }
             println!(
                 "  {}",
                 format!("Final price:    ${:.2}", final_price).bold()
             );
         }
-        println!(
-            "  Your balance:   ${:.2}",
-            user_balance
-        );
+        println!("  Your balance:   ${:.2}", user_balance);
         println!();
 
         if !can_afford {
@@ -394,22 +388,14 @@ async fn purchase(
                 println!("  Renews:    {}", renewal);
             }
         }
-        println!(
-            "  Balance:   ${:.2}",
-            result.new_balance.unwrap_or(0.0)
-        );
+        println!("  Balance:   ${:.2}", result.new_balance.unwrap_or(0.0));
         println!();
     }
 
     Ok(())
 }
 
-
-async fn order(
-    reference: Option<&str>,
-    history: bool,
-    profile: Option<&str>,
-) -> CliResult<()> {
+async fn order(reference: Option<&str>, history: bool, profile: Option<&str>) -> CliResult<()> {
     let api = get_api(profile)?;
 
     if history || reference.is_none() {
@@ -437,7 +423,14 @@ async fn order(
             .load_preset(UTF8_FULL)
             .apply_modifier(UTF8_ROUND_CORNERS)
             .set_content_arrangement(ContentArrangement::Dynamic)
-            .set_header(vec!["Reference", "Product", "Amount", "Period", "Status", "Date"]);
+            .set_header(vec![
+                "Reference",
+                "Product",
+                "Amount",
+                "Period",
+                "Status",
+                "Date",
+            ]);
 
         for o in orders {
             let status = o.status.as_deref().unwrap_or("—");
@@ -524,12 +517,7 @@ async fn order(
     Ok(())
 }
 
-
-async fn invoice(
-    reference: Option<&str>,
-    list: bool,
-    profile: Option<&str>,
-) -> CliResult<()> {
+async fn invoice(reference: Option<&str>, list: bool, profile: Option<&str>) -> CliResult<()> {
     let api = get_api(profile)?;
 
     if list || reference.is_none() {
@@ -624,11 +612,7 @@ async fn invoice(
 async fn renew(invoice_ref: &str, profile: Option<&str>) -> CliResult<()> {
     let api = get_api(profile)?;
 
-    eprintln!(
-        "  {} Paying invoice '{}'...",
-        "→".dimmed(),
-        invoice_ref
-    );
+    eprintln!("  {} Paying invoice '{}'...", "→".dimmed(), invoice_ref);
     let result = api.pay_invoice_with_balance(invoice_ref).await?;
 
     if output::is_json() {
@@ -649,10 +633,7 @@ async fn renew(invoice_ref: &str, profile: Option<&str>) -> CliResult<()> {
         );
         println!(
             "  Invoice:       {}",
-            result
-                .invoice_status
-                .as_deref()
-                .unwrap_or("—")
+            result.invoice_status.as_deref().unwrap_or("—")
         );
         println!(
             "  New balance:   ${:.2}",

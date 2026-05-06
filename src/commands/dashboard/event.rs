@@ -43,8 +43,9 @@ impl EventHandler {
                 .await;
 
                 if let Ok(Some(CrosstermEvent::Key(key))) = maybe_event
-                    && key_tx.send(Event::Key(key)).is_err() {
-                        break;
+                    && key_tx.send(Event::Key(key)).is_err()
+                {
+                    break;
                 }
             }
         });

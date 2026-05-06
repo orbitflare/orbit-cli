@@ -17,16 +17,56 @@ pub enum PriceHighlight {
 pub fn ticker_prices() -> Vec<CoinPrice> {
     let mut rng = rand::rng();
     vec![
-        CoinPrice { symbol: "SOL",        price: 84.0  + rng.random_range(-2.0..2.0),   highlight: PriceHighlight::Green },
-        CoinPrice { symbol: "BNB",        price: 617.0 + rng.random_range(-5.0..5.0),   highlight: PriceHighlight::Yellow },
-        CoinPrice { symbol: "BTC",        price: 67880.0 + rng.random_range(-200.0..200.0), highlight: PriceHighlight::Normal },
-        CoinPrice { symbol: "ETH",        price: 2010.0 + rng.random_range(-30.0..30.0), highlight: PriceHighlight::Normal },
-        CoinPrice { symbol: "XRP",        price: 1.45  + rng.random_range(-0.1..0.1),   highlight: PriceHighlight::Normal },
-        CoinPrice { symbol: "TRX",        price: 0.28  + rng.random_range(-0.02..0.02), highlight: PriceHighlight::Normal },
-        CoinPrice { symbol: "DOGE",       price: 0.10  + rng.random_range(-0.01..0.01), highlight: PriceHighlight::Normal },
-        CoinPrice { symbol: "FIGR_HELOC", price: 1.02  + rng.random_range(-0.05..0.05), highlight: PriceHighlight::Normal },
-        CoinPrice { symbol: "BCH",        price: 559.0 + rng.random_range(-10.0..10.0), highlight: PriceHighlight::Normal },
-        CoinPrice { symbol: "WBT",        price: 51.29 + rng.random_range(-1.0..1.0),   highlight: PriceHighlight::Normal },
+        CoinPrice {
+            symbol: "SOL",
+            price: 84.0 + rng.random_range(-2.0..2.0),
+            highlight: PriceHighlight::Green,
+        },
+        CoinPrice {
+            symbol: "BNB",
+            price: 617.0 + rng.random_range(-5.0..5.0),
+            highlight: PriceHighlight::Yellow,
+        },
+        CoinPrice {
+            symbol: "BTC",
+            price: 67880.0 + rng.random_range(-200.0..200.0),
+            highlight: PriceHighlight::Normal,
+        },
+        CoinPrice {
+            symbol: "ETH",
+            price: 2010.0 + rng.random_range(-30.0..30.0),
+            highlight: PriceHighlight::Normal,
+        },
+        CoinPrice {
+            symbol: "XRP",
+            price: 1.45 + rng.random_range(-0.1..0.1),
+            highlight: PriceHighlight::Normal,
+        },
+        CoinPrice {
+            symbol: "TRX",
+            price: 0.28 + rng.random_range(-0.02..0.02),
+            highlight: PriceHighlight::Normal,
+        },
+        CoinPrice {
+            symbol: "DOGE",
+            price: 0.10 + rng.random_range(-0.01..0.01),
+            highlight: PriceHighlight::Normal,
+        },
+        CoinPrice {
+            symbol: "FIGR_HELOC",
+            price: 1.02 + rng.random_range(-0.05..0.05),
+            highlight: PriceHighlight::Normal,
+        },
+        CoinPrice {
+            symbol: "BCH",
+            price: 559.0 + rng.random_range(-10.0..10.0),
+            highlight: PriceHighlight::Normal,
+        },
+        CoinPrice {
+            symbol: "WBT",
+            price: 51.29 + rng.random_range(-1.0..1.0),
+            highlight: PriceHighlight::Normal,
+        },
     ]
 }
 #[derive(Clone, Default)]

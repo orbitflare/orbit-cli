@@ -570,7 +570,11 @@ impl OrbitApi {
             .timeout(Duration::from_secs(30))
             .build()
             .expect("Failed to create HTTP client");
-        Self { client, api_key, token: None }
+        Self {
+            client,
+            api_key,
+            token: None,
+        }
     }
 
     pub fn with_token(token: &str) -> Self {
@@ -578,7 +582,11 @@ impl OrbitApi {
             .timeout(Duration::from_secs(30))
             .build()
             .expect("Failed to create HTTP client");
-        Self { client, api_key: None, token: Some(token.to_string()) }
+        Self {
+            client,
+            api_key: None,
+            token: Some(token.to_string()),
+        }
     }
 
     fn auth_header(&self, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
@@ -591,21 +599,32 @@ impl OrbitApi {
         }
     }
 
-
     pub async fn device_code(&self) -> CliResult<DeviceCodeData> {
         let req = self.client.post(format!("{}/auth/device/code", BASE_URL));
         let resp = self.auth_header(req).send().await?;
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
-            return Err(format!("POST /auth/device/code — HTTP {}: {}", status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "POST /auth/device/code — HTTP {}: {}",
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         let parsed: ApiResponse<DeviceCodeData> = serde_json::from_str(&text)?;
-        parsed.data.ok_or_else(|| format!("No data in response: {}", parsed.message.unwrap_or_default()).into())
+        parsed.data.ok_or_else(|| {
+            format!(
+                "No data in response: {}",
+                parsed.message.unwrap_or_default()
+            )
+            .into()
+        })
     }
 
     pub async fn device_token(&self, device_code: &str) -> CliResult<DevicePollResult> {
-        let req = self.client
+        let req = self
+            .client
             .post(format!("{}/auth/device/token", BASE_URL))
             .json(&serde_json::json!({ "device_code": device_code }));
         let resp = self.auth_header(req).send().await?;
@@ -628,30 +647,57 @@ impl OrbitApi {
             }
         }
 
-        if status.as_u16() == 428 { return Ok(DevicePollResult::Pending); }
-        if status.as_u16() == 429 { return Ok(DevicePollResult::SlowDown); }
-        if status.as_u16() == 410 { return Ok(DevicePollResult::Expired); }
+        if status.as_u16() == 428 {
+            return Ok(DevicePollResult::Pending);
+        }
+        if status.as_u16() == 429 {
+            return Ok(DevicePollResult::SlowDown);
+        }
+        if status.as_u16() == 410 {
+            return Ok(DevicePollResult::Expired);
+        }
 
-        Err(format!("POST /auth/device/token — HTTP {}: {}", status.as_u16(), extract_error(&text)).into())
+        Err(format!(
+            "POST /auth/device/token — HTTP {}: {}",
+            status.as_u16(),
+            extract_error(&text)
+        )
+        .into())
     }
 
-
     pub async fn wallet_challenge(&self, wallet_address: &str) -> CliResult<WalletChallengeData> {
-        let req = self.client
+        let req = self
+            .client
             .post(format!("{}/auth/wallet/challenge", BASE_URL))
             .json(&serde_json::json!({ "wallet_address": wallet_address }));
         let resp = self.auth_header(req).send().await?;
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
-            return Err(format!("POST /auth/wallet/challenge — HTTP {}: {}", status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "POST /auth/wallet/challenge — HTTP {}: {}",
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         let parsed: ApiResponse<WalletChallengeData> = serde_json::from_str(&text)?;
-        parsed.data.ok_or_else(|| format!("No data in response: {}", parsed.message.unwrap_or_default()).into())
+        parsed.data.ok_or_else(|| {
+            format!(
+                "No data in response: {}",
+                parsed.message.unwrap_or_default()
+            )
+            .into()
+        })
     }
 
-    pub async fn wallet_verify(&self, wallet_address: &str, signature: &str) -> CliResult<WalletAuthData> {
-        let req = self.client
+    pub async fn wallet_verify(
+        &self,
+        wallet_address: &str,
+        signature: &str,
+    ) -> CliResult<WalletAuthData> {
+        let req = self
+            .client
             .post(format!("{}/auth/wallet/verify", BASE_URL))
             .json(&serde_json::json!({ "wallet_address": wallet_address, "signature": signature }));
         let resp = self.auth_header(req).send().await?;
@@ -659,16 +705,34 @@ impl OrbitApi {
         let text = resp.text().await?;
         if !status.is_success() {
             if let Ok(parsed) = serde_json::from_str::<ApiResponse<serde_json::Value>>(&text)
-                && parsed.error.as_deref() == Some("wallet_not_linked") {
-                    return Err(CliError::WalletNotLinked);
+                && parsed.error.as_deref() == Some("wallet_not_linked")
+            {
+                return Err(CliError::WalletNotLinked);
             }
-            return Err(format!("POST /auth/wallet/verify — HTTP {}: {}", status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "POST /auth/wallet/verify — HTTP {}: {}",
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         let parsed: ApiResponse<WalletAuthData> = serde_json::from_str(&text)?;
-        parsed.data.ok_or_else(|| format!("No data in response: {}", parsed.message.unwrap_or_default()).into())
+        parsed.data.ok_or_else(|| {
+            format!(
+                "No data in response: {}",
+                parsed.message.unwrap_or_default()
+            )
+            .into()
+        })
     }
 
-    pub async fn wallet_register(&self, wallet_address: &str, signature: &str, name: &str, email: &str) -> CliResult<WalletAuthData> {
+    pub async fn wallet_register(
+        &self,
+        wallet_address: &str,
+        signature: &str,
+        name: &str,
+        email: &str,
+    ) -> CliResult<WalletAuthData> {
         let req = self.client
             .post(format!("{}/auth/wallet/register", BASE_URL))
             .json(&serde_json::json!({ "wallet_address": wallet_address, "signature": signature, "name": name, "email": email }));
@@ -676,15 +740,26 @@ impl OrbitApi {
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
-            return Err(format!("POST /auth/wallet/register — HTTP {}: {}", status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "POST /auth/wallet/register — HTTP {}: {}",
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         let parsed: ApiResponse<WalletAuthData> = serde_json::from_str(&text)?;
-        parsed.data.ok_or_else(|| format!("No data in response: {}", parsed.message.unwrap_or_default()).into())
+        parsed.data.ok_or_else(|| {
+            format!(
+                "No data in response: {}",
+                parsed.message.unwrap_or_default()
+            )
+            .into()
+        })
     }
 
-
     pub async fn me_with_api_key(&self, api_key: &str) -> CliResult<UserData> {
-        let resp = self.client
+        let resp = self
+            .client
             .get(format!("{}/auth/me", BASE_URL))
             .header("X-ORBIT-KEY", api_key)
             .send()
@@ -693,7 +768,8 @@ impl OrbitApi {
     }
 
     pub async fn me_with_token(&self, token: &str) -> CliResult<UserData> {
-        let req = self.client
+        let req = self
+            .client
             .get(format!("{}/auth/me", BASE_URL))
             .header("Authorization", format!("Bearer {}", token));
         let resp = self.auth_header(req).send().await?;
@@ -704,10 +780,21 @@ impl OrbitApi {
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
-            return Err(format!("GET /auth/me — HTTP {}: {}", status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "GET /auth/me — HTTP {}: {}",
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         let parsed: ApiResponse<UserData> = serde_json::from_str(&text)?;
-        parsed.data.ok_or_else(|| format!("No data in response: {}", parsed.message.unwrap_or_default()).into())
+        parsed.data.ok_or_else(|| {
+            format!(
+                "No data in response: {}",
+                parsed.message.unwrap_or_default()
+            )
+            .into()
+        })
     }
 
     pub async fn profile(&self) -> CliResult<ProfileData> {
@@ -716,10 +803,21 @@ impl OrbitApi {
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
-            return Err(format!("GET /profile — HTTP {}: {}", status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "GET /profile — HTTP {}: {}",
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         let parsed: ApiResponse<ProfileData> = serde_json::from_str(&text)?;
-        parsed.data.ok_or_else(|| format!("No data in response: {}", parsed.message.unwrap_or_default()).into())
+        parsed.data.ok_or_else(|| {
+            format!(
+                "No data in response: {}",
+                parsed.message.unwrap_or_default()
+            )
+            .into()
+        })
     }
 
     pub async fn balance(&self) -> CliResult<BalanceData> {
@@ -728,12 +826,22 @@ impl OrbitApi {
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
-            return Err(format!("GET /balance — HTTP {}: {}", status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "GET /balance — HTTP {}: {}",
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         let parsed: ApiResponse<BalanceData> = serde_json::from_str(&text)?;
-        parsed.data.ok_or_else(|| format!("No data in response: {}", parsed.message.unwrap_or_default()).into())
+        parsed.data.ok_or_else(|| {
+            format!(
+                "No data in response: {}",
+                parsed.message.unwrap_or_default()
+            )
+            .into()
+        })
     }
-
 
     pub async fn licenses(&self) -> CliResult<Vec<LicenseData>> {
         let req = self.client.get(format!("{}/licenses", BASE_URL));
@@ -741,24 +849,36 @@ impl OrbitApi {
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
-            return Err(format!("GET /licenses — HTTP {}: {}", status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "GET /licenses — HTTP {}: {}",
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         let parsed: ApiResponse<LicensesWrapper> = serde_json::from_str(&text)?;
         Ok(parsed.data.map(|w| w.licenses).unwrap_or_default())
     }
 
     pub async fn license_detail(&self, license_key: &str) -> CliResult<Option<LicenseDetailData>> {
-        let req = self.client.get(format!("{}/licenses/{}", BASE_URL, license_key));
+        let req = self
+            .client
+            .get(format!("{}/licenses/{}", BASE_URL, license_key));
         let resp = self.auth_header(req).send().await?;
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
-            return Err(format!("GET /licenses/{} — HTTP {}: {}", license_key, status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "GET /licenses/{} — HTTP {}: {}",
+                license_key,
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         let parsed: ApiResponse<LicenseDetailWrapper> = serde_json::from_str(&text)?;
         Ok(parsed.data.and_then(|w| w.license))
     }
-
 
     pub async fn invoices(&self) -> CliResult<Vec<InvoiceData>> {
         let req = self.client.get(format!("{}/invoices", BASE_URL));
@@ -766,16 +886,21 @@ impl OrbitApi {
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
-            return Err(format!("GET /invoices — HTTP {}: {}", status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "GET /invoices — HTTP {}: {}",
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         if let Ok(parsed) = serde_json::from_str::<ApiResponse<PaginatedInvoices>>(&text)
-            && let Some(paginated) = parsed.data {
-                return Ok(paginated.data);
+            && let Some(paginated) = parsed.data
+        {
+            return Ok(paginated.data);
         }
         let parsed: ApiResponse<Vec<InvoiceData>> = serde_json::from_str(&text)?;
         Ok(parsed.data.unwrap_or_default())
     }
-
 
     pub async fn api_keys(&self) -> ApiResult<Vec<ApiKeyEntry>> {
         let req = self.client.get(format!("{}/api-keys", BASE_URL));
@@ -783,14 +908,22 @@ impl OrbitApi {
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
-            return Err(format!("GET /api-keys — HTTP {}: {}", status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "GET /api-keys — HTTP {}: {}",
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         let parsed: ApiResponse<ApiKeysWrapper> = serde_json::from_str(&text)?;
         Ok(parsed.data.map(|w| w.api_keys).unwrap_or_default())
     }
 
-
-    pub async fn update_profile(&self, name: Option<&str>, payment_wallet_address: Option<&str>) -> ApiResult<ProfileData> {
+    pub async fn update_profile(
+        &self,
+        name: Option<&str>,
+        payment_wallet_address: Option<&str>,
+    ) -> ApiResult<ProfileData> {
         let mut body = serde_json::Map::new();
         if let Some(n) = name {
             body.insert("name".into(), serde_json::json!(n));
@@ -798,88 +931,162 @@ impl OrbitApi {
         if let Some(w) = payment_wallet_address {
             body.insert("payment_wallet_address".into(), serde_json::json!(w));
         }
-        let req = self.client
+        let req = self
+            .client
             .put(format!("{}/profile", BASE_URL))
             .json(&serde_json::Value::Object(body));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<ProfileData>(resp, "PUT /profile").await
+        self.parse_response::<ProfileData>(resp, "PUT /profile")
+            .await
     }
-
 
     pub async fn license_regenerate_key(&self, license_key: &str) -> ApiResult<serde_json::Value> {
-        self.post_empty(&format!("/licenses/{}/regenerate-key", license_key)).await
+        self.post_empty(&format!("/licenses/{}/regenerate-key", license_key))
+            .await
     }
 
-    pub async fn license_toggle_auth_mode(&self, license_key: &str, auth_mode: &str) -> ApiResult<serde_json::Value> {
-        let req = self.client
-            .post(format!("{}/licenses/{}/toggle-auth-mode", BASE_URL, license_key))
+    pub async fn license_toggle_auth_mode(
+        &self,
+        license_key: &str,
+        auth_mode: &str,
+    ) -> ApiResult<serde_json::Value> {
+        let req = self
+            .client
+            .post(format!(
+                "{}/licenses/{}/toggle-auth-mode",
+                BASE_URL, license_key
+            ))
             .json(&serde_json::json!({ "auth_mode": auth_mode }));
         let resp = self.auth_header(req).send().await?;
-        self.parse_json_response(resp, &format!("POST /licenses/{}/toggle-auth-mode", license_key)).await
+        self.parse_json_response(
+            resp,
+            &format!("POST /licenses/{}/toggle-auth-mode", license_key),
+        )
+        .await
     }
 
-    pub async fn license_toggle_auto_renewal(&self, license_key: &str) -> ApiResult<serde_json::Value> {
-        self.post_empty(&format!("/licenses/{}/toggle-auto-renewal", license_key)).await
+    pub async fn license_toggle_auto_renewal(
+        &self,
+        license_key: &str,
+    ) -> ApiResult<serde_json::Value> {
+        self.post_empty(&format!("/licenses/{}/toggle-auto-renewal", license_key))
+            .await
     }
 
-    pub async fn license_add_ip(&self, license_key: &str, ip_address: &str, location_id: u64) -> ApiResult<serde_json::Value> {
-        let req = self.client
+    pub async fn license_add_ip(
+        &self,
+        license_key: &str,
+        ip_address: &str,
+        location_id: u64,
+    ) -> ApiResult<serde_json::Value> {
+        let req = self
+            .client
             .post(format!("{}/licenses/{}/ips", BASE_URL, license_key))
             .json(&serde_json::json!({ "ip_address": ip_address, "location_id": location_id }));
         let resp = self.auth_header(req).send().await?;
-        self.parse_json_response(resp, &format!("POST /licenses/{}/ips", license_key)).await
+        self.parse_json_response(resp, &format!("POST /licenses/{}/ips", license_key))
+            .await
     }
 
-    pub async fn license_remove_ip(&self, license_key: &str, ip_address: &str, location_id: u64) -> ApiResult<serde_json::Value> {
-        let req = self.client
+    pub async fn license_remove_ip(
+        &self,
+        license_key: &str,
+        ip_address: &str,
+        location_id: u64,
+    ) -> ApiResult<serde_json::Value> {
+        let req = self
+            .client
             .delete(format!("{}/licenses/{}/ips", BASE_URL, license_key))
             .json(&serde_json::json!({ "ip_address": ip_address, "location_id": location_id }));
         let resp = self.auth_header(req).send().await?;
-        self.parse_json_response(resp, &format!("DELETE /licenses/{}/ips", license_key)).await
+        self.parse_json_response(resp, &format!("DELETE /licenses/{}/ips", license_key))
+            .await
     }
 
-    pub async fn license_add_domain(&self, license_key: &str, domain: &str) -> ApiResult<serde_json::Value> {
-        let req = self.client
+    pub async fn license_add_domain(
+        &self,
+        license_key: &str,
+        domain: &str,
+    ) -> ApiResult<serde_json::Value> {
+        let req = self
+            .client
             .post(format!("{}/licenses/{}/domains", BASE_URL, license_key))
             .json(&serde_json::json!({ "domain": domain }));
         let resp = self.auth_header(req).send().await?;
-        self.parse_json_response(resp, &format!("POST /licenses/{}/domains", license_key)).await
+        self.parse_json_response(resp, &format!("POST /licenses/{}/domains", license_key))
+            .await
     }
 
-    pub async fn license_remove_domain(&self, license_key: &str, domain: &str) -> ApiResult<serde_json::Value> {
-        let req = self.client
+    pub async fn license_remove_domain(
+        &self,
+        license_key: &str,
+        domain: &str,
+    ) -> ApiResult<serde_json::Value> {
+        let req = self
+            .client
             .delete(format!("{}/licenses/{}/domains", BASE_URL, license_key))
             .json(&serde_json::json!({ "domain": domain }));
         let resp = self.auth_header(req).send().await?;
-        self.parse_json_response(resp, &format!("DELETE /licenses/{}/domains", license_key)).await
+        self.parse_json_response(resp, &format!("DELETE /licenses/{}/domains", license_key))
+            .await
     }
 
-    pub async fn license_add_devnet_domain(&self, license_key: &str, domain: &str) -> ApiResult<serde_json::Value> {
-        let req = self.client
-            .post(format!("{}/licenses/{}/devnet-domains", BASE_URL, license_key))
+    pub async fn license_add_devnet_domain(
+        &self,
+        license_key: &str,
+        domain: &str,
+    ) -> ApiResult<serde_json::Value> {
+        let req = self
+            .client
+            .post(format!(
+                "{}/licenses/{}/devnet-domains",
+                BASE_URL, license_key
+            ))
             .json(&serde_json::json!({ "domain": domain }));
         let resp = self.auth_header(req).send().await?;
-        self.parse_json_response(resp, &format!("POST /licenses/{}/devnet-domains", license_key)).await
+        self.parse_json_response(
+            resp,
+            &format!("POST /licenses/{}/devnet-domains", license_key),
+        )
+        .await
     }
 
-    pub async fn license_remove_devnet_domain(&self, license_key: &str, domain: &str) -> ApiResult<serde_json::Value> {
-        let req = self.client
-            .delete(format!("{}/licenses/{}/devnet-domains", BASE_URL, license_key))
+    pub async fn license_remove_devnet_domain(
+        &self,
+        license_key: &str,
+        domain: &str,
+    ) -> ApiResult<serde_json::Value> {
+        let req = self
+            .client
+            .delete(format!(
+                "{}/licenses/{}/devnet-domains",
+                BASE_URL, license_key
+            ))
             .json(&serde_json::json!({ "domain": domain }));
         let resp = self.auth_header(req).send().await?;
-        self.parse_json_response(resp, &format!("DELETE /licenses/{}/devnet-domains", license_key)).await
+        self.parse_json_response(
+            resp,
+            &format!("DELETE /licenses/{}/devnet-domains", license_key),
+        )
+        .await
     }
-
 
     pub async fn create_api_key(&self, name: &str) -> ApiResult<CreatedApiKey> {
-        let req = self.client
+        let req = self
+            .client
             .post(format!("{}/api-keys", BASE_URL))
             .json(&serde_json::json!({ "name": name }));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<CreatedApiKey>(resp, "POST /api-keys").await
+        self.parse_response::<CreatedApiKey>(resp, "POST /api-keys")
+            .await
     }
 
-    pub async fn update_api_key(&self, id: u64, name: Option<&str>, enabled: Option<bool>) -> ApiResult<ApiKeyEntry> {
+    pub async fn update_api_key(
+        &self,
+        id: u64,
+        name: Option<&str>,
+        enabled: Option<bool>,
+    ) -> ApiResult<ApiKeyEntry> {
         let mut body = serde_json::Map::new();
         if let Some(n) = name {
             body.insert("name".into(), serde_json::json!(n));
@@ -887,11 +1094,13 @@ impl OrbitApi {
         if let Some(e) = enabled {
             body.insert("enabled".into(), serde_json::json!(e));
         }
-        let req = self.client
+        let req = self
+            .client
             .put(format!("{}/api-keys/{}", BASE_URL, id))
             .json(&serde_json::Value::Object(body));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<ApiKeyEntry>(resp, &format!("PUT /api-keys/{}", id)).await
+        self.parse_response::<ApiKeyEntry>(resp, &format!("PUT /api-keys/{}", id))
+            .await
     }
 
     pub async fn delete_api_key(&self, id: u64) -> ApiResult<String> {
@@ -900,55 +1109,83 @@ impl OrbitApi {
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
-            return Err(format!("DELETE /api-keys/{} — HTTP {}: {}", id, status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "DELETE /api-keys/{} — HTTP {}: {}",
+                id,
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         let parsed: ApiResponse<serde_json::Value> = serde_json::from_str(&text)?;
         Ok(parsed.message.unwrap_or_else(|| "Deleted".into()))
     }
 
     pub async fn regenerate_api_key(&self, id: u64) -> ApiResult<CreatedApiKey> {
-        let req = self.client.post(format!("{}/api-keys/{}/regenerate", BASE_URL, id));
+        let req = self
+            .client
+            .post(format!("{}/api-keys/{}/regenerate", BASE_URL, id));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<CreatedApiKey>(resp, &format!("POST /api-keys/{}/regenerate", id)).await
+        self.parse_response::<CreatedApiKey>(resp, &format!("POST /api-keys/{}/regenerate", id))
+            .await
     }
 
     pub async fn api_key_add_ip(&self, id: u64, ip: &str) -> ApiResult<ApiKeyEntry> {
-        let req = self.client
+        let req = self
+            .client
             .post(format!("{}/api-keys/{}/ips", BASE_URL, id))
             .json(&serde_json::json!({ "ip": ip }));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<ApiKeyEntry>(resp, &format!("POST /api-keys/{}/ips", id)).await
+        self.parse_response::<ApiKeyEntry>(resp, &format!("POST /api-keys/{}/ips", id))
+            .await
     }
 
     pub async fn api_key_remove_ip(&self, id: u64, ip: &str) -> ApiResult<ApiKeyEntry> {
-        let req = self.client
+        let req = self
+            .client
             .delete(format!("{}/api-keys/{}/ips", BASE_URL, id))
             .json(&serde_json::json!({ "ip": ip }));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<ApiKeyEntry>(resp, &format!("DELETE /api-keys/{}/ips", id)).await
+        self.parse_response::<ApiKeyEntry>(resp, &format!("DELETE /api-keys/{}/ips", id))
+            .await
     }
 
-
-    pub async fn topup_prepare(&self, amount: f64, wallet_address: &str) -> ApiResult<TopupPrepareData> {
-        let req = self.client
+    pub async fn topup_prepare(
+        &self,
+        amount: f64,
+        wallet_address: &str,
+    ) -> ApiResult<TopupPrepareData> {
+        let req = self
+            .client
             .post(format!("{}/topup/prepare", BASE_URL))
             .json(&serde_json::json!({ "amount": amount, "wallet_address": wallet_address }));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<TopupPrepareData>(resp, "POST /topup/prepare").await
+        self.parse_response::<TopupPrepareData>(resp, "POST /topup/prepare")
+            .await
     }
 
-    pub async fn topup_confirm(&self, transaction: &str, wallet_address: &str, amount: f64) -> ApiResult<TopupConfirmData> {
+    pub async fn topup_confirm(
+        &self,
+        transaction: &str,
+        wallet_address: &str,
+        amount: f64,
+    ) -> ApiResult<TopupConfirmData> {
         let req = self.client
             .post(format!("{}/topup/confirm", BASE_URL))
             .json(&serde_json::json!({ "transaction": transaction, "wallet_address": wallet_address, "amount": amount }));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<TopupConfirmData>(resp, "POST /topup/confirm").await
+        self.parse_response::<TopupConfirmData>(resp, "POST /topup/confirm")
+            .await
     }
 
     pub async fn topup_history(&self, page: u32, per_page: u32) -> ApiResult<TopupHistoryData> {
-        let req = self.client.get(format!("{}/topup/history?page={}&per_page={}", BASE_URL, page, per_page));
+        let req = self.client.get(format!(
+            "{}/topup/history?page={}&per_page={}",
+            BASE_URL, page, per_page
+        ));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<TopupHistoryData>(resp, "GET /topup/history").await
+        self.parse_response::<TopupHistoryData>(resp, "GET /topup/history")
+            .await
     }
 
     pub async fn rpc_plans(&self) -> ApiResult<Vec<RpcPlan>> {
@@ -958,79 +1195,143 @@ impl OrbitApi {
         Ok(data.plans)
     }
 
-    pub async fn orders_validate(&self, product_slug: &str, billing_period: &str, discount_code: Option<&str>) -> ApiResult<OrderValidateData> {
-        let mut body = serde_json::json!({ "product_slug": product_slug, "billing_period": billing_period });
+    pub async fn orders_validate(
+        &self,
+        product_slug: &str,
+        billing_period: &str,
+        discount_code: Option<&str>,
+    ) -> ApiResult<OrderValidateData> {
+        let mut body =
+            serde_json::json!({ "product_slug": product_slug, "billing_period": billing_period });
         if let Some(code) = discount_code {
             body["discount_code"] = serde_json::json!(code);
         }
-        let req = self.client
+        let req = self
+            .client
             .post(format!("{}/orders/validate", BASE_URL))
             .json(&body);
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<OrderValidateData>(resp, "POST /orders/validate").await
+        self.parse_response::<OrderValidateData>(resp, "POST /orders/validate")
+            .await
     }
 
-    pub async fn orders_purchase(&self, product_slug: &str, billing_period: &str, discount_code: Option<&str>) -> ApiResult<OrderPurchaseData> {
-        let mut body = serde_json::json!({ "product_slug": product_slug, "billing_period": billing_period });
+    pub async fn orders_purchase(
+        &self,
+        product_slug: &str,
+        billing_period: &str,
+        discount_code: Option<&str>,
+    ) -> ApiResult<OrderPurchaseData> {
+        let mut body =
+            serde_json::json!({ "product_slug": product_slug, "billing_period": billing_period });
         if let Some(code) = discount_code {
             body["discount_code"] = serde_json::json!(code);
         }
-        let req = self.client
+        let req = self
+            .client
             .post(format!("{}/orders/purchase", BASE_URL))
             .json(&body);
         let resp = self.auth_header(req).send().await?;
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() && status.as_u16() != 402 {
-            return Err(format!("POST /orders/purchase — HTTP {}: {}", status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "POST /orders/purchase — HTTP {}: {}",
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         if status.as_u16() == 402 {
-            return Err("Insufficient balance. Top up first with: orbitflare pay topup <amount>".into());
+            return Err(
+                "Insufficient balance. Top up first with: orbitflare pay topup <amount>".into(),
+            );
         }
         let parsed: ApiResponse<OrderPurchaseData> = serde_json::from_str(&text)?;
-        parsed.data.ok_or_else(|| format!("No data in response: {}", parsed.message.unwrap_or_default()).into())
+        parsed.data.ok_or_else(|| {
+            format!(
+                "No data in response: {}",
+                parsed.message.unwrap_or_default()
+            )
+            .into()
+        })
     }
 
     pub async fn orders_list(&self, page: u32, per_page: u32) -> ApiResult<OrdersListData> {
-        let req = self.client.get(format!("{}/orders?page={}&per_page={}", BASE_URL, page, per_page));
+        let req = self.client.get(format!(
+            "{}/orders?page={}&per_page={}",
+            BASE_URL, page, per_page
+        ));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<OrdersListData>(resp, "GET /orders").await
+        self.parse_response::<OrdersListData>(resp, "GET /orders")
+            .await
     }
 
     pub async fn order_detail(&self, reference: &str) -> ApiResult<OrderDetailData> {
-        let req = self.client.get(format!("{}/orders/{}", BASE_URL, reference));
+        let req = self
+            .client
+            .get(format!("{}/orders/{}", BASE_URL, reference));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<OrderDetailData>(resp, &format!("GET /orders/{}", reference)).await
+        self.parse_response::<OrderDetailData>(resp, &format!("GET /orders/{}", reference))
+            .await
     }
 
     pub async fn pay_invoice_with_balance(&self, reference: &str) -> ApiResult<PayInvoiceData> {
-        let req = self.client.post(format!("{}/invoices/{}/pay-with-balance", BASE_URL, reference));
+        let req = self.client.post(format!(
+            "{}/invoices/{}/pay-with-balance",
+            BASE_URL, reference
+        ));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<PayInvoiceData>(resp, &format!("POST /invoices/{}/pay-with-balance", reference)).await
+        self.parse_response::<PayInvoiceData>(
+            resp,
+            &format!("POST /invoices/{}/pay-with-balance", reference),
+        )
+        .await
     }
-
 
     async fn post_empty(&self, path: &str) -> ApiResult<serde_json::Value> {
         let req = self.client.post(format!("{}{}", BASE_URL, path));
         let resp = self.auth_header(req).send().await?;
-        self.parse_json_response(resp, &format!("POST {}", path)).await
+        self.parse_json_response(resp, &format!("POST {}", path))
+            .await
     }
 
-    async fn parse_response<T: serde::de::DeserializeOwned + Default>(&self, resp: reqwest::Response, label: &str) -> ApiResult<T> {
+    async fn parse_response<T: serde::de::DeserializeOwned + Default>(
+        &self,
+        resp: reqwest::Response,
+        label: &str,
+    ) -> ApiResult<T> {
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
-            return Err(format!("{} — HTTP {}: {}", label, status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "{} — HTTP {}: {}",
+                label,
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         let parsed: ApiResponse<T> = serde_json::from_str(&text)?;
-        parsed.data.ok_or_else(|| format!("No data in {}: {}", label, text).into())
+        parsed
+            .data
+            .ok_or_else(|| format!("No data in {}: {}", label, text).into())
     }
 
-    async fn parse_json_response(&self, resp: reqwest::Response, label: &str) -> ApiResult<serde_json::Value> {
+    async fn parse_json_response(
+        &self,
+        resp: reqwest::Response,
+        label: &str,
+    ) -> ApiResult<serde_json::Value> {
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
-            return Err(format!("{} — HTTP {}: {}", label, status.as_u16(), extract_error(&text)).into());
+            return Err(format!(
+                "{} — HTTP {}: {}",
+                label,
+                status.as_u16(),
+                extract_error(&text)
+            )
+            .into());
         }
         let parsed: ApiResponse<serde_json::Value> = serde_json::from_str(&text)?;
         Ok(parsed.data.unwrap_or(serde_json::Value::Null))

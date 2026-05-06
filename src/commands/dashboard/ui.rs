@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
 
 use super::app::{App, DetailTab, Panel, Section, ViewMode};
@@ -19,17 +19,11 @@ pub fn render(frame: &mut Frame, app: &App) {
     theme!(app => bg);
     let size = frame.area();
 
-    frame.render_widget(
-        Block::default().style(Style::default().bg(bg)),
-        size,
-    );
+    frame.render_widget(Block::default().style(Style::default().bg(bg)), size);
 
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Min(10),
-        ])
+        .constraints([Constraint::Length(1), Constraint::Min(10)])
         .split(size);
 
     render_ticker(frame, app, rows[0]);
@@ -37,10 +31,7 @@ pub fn render(frame: &mut Frame, app: &App) {
     let sidebar_width = if app.sidebar_collapsed { 5 } else { 28 };
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length(sidebar_width),
-            Constraint::Min(40),
-        ])
+        .constraints([Constraint::Length(sidebar_width), Constraint::Min(40)])
         .split(rows[1]);
 
     render_sidebar(frame, app, cols[0]);
@@ -79,13 +70,18 @@ fn render_ticker(frame: &mut Frame, app: &App, area: Rect) {
             spans.push(Span::styled(format!("{} ", coin.symbol), bold_style));
             spans.push(Span::styled(format!("${:.2}  ", coin.price), bold_style));
         } else {
-            spans.push(Span::styled(format!("{}:", coin.symbol), Style::default().fg(label)));
-            spans.push(Span::styled(format!(" ${:.2}  ", coin.price), Style::default().fg(value)));
+            spans.push(Span::styled(
+                format!("{}:", coin.symbol),
+                Style::default().fg(label),
+            ));
+            spans.push(Span::styled(
+                format!(" ${:.2}  ", coin.price),
+                Style::default().fg(value),
+            ));
         }
     }
 
-    let ticker = Paragraph::new(Line::from(spans))
-        .style(Style::default().bg(ticker_bg));
+    let ticker = Paragraph::new(Line::from(spans)).style(Style::default().bg(ticker_bg));
     frame.render_widget(ticker, area);
 }
 fn render_sidebar(frame: &mut Frame, app: &App, area: Rect) {
@@ -100,7 +96,10 @@ fn render_sidebar(frame: &mut Frame, app: &App, area: Rect) {
         let inner = shrink(area, 0, 1, 0, 0);
         let mut lines: Vec<Line> = vec![
             Line::from(""),
-            Line::from(Span::styled("  \u{25c8}", Style::default().fg(accent).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled(
+                "  \u{25c8}",
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
+            )),
             Line::from(""),
         ];
         for (i, item) in app.sidebar_items.iter().enumerate() {
@@ -133,26 +132,36 @@ fn render_sidebar(frame: &mut Frame, app: &App, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled("  \u{25c8} ", Style::default().fg(accent)),
-            Span::styled("Orbit", Style::default().fg(value).add_modifier(Modifier::BOLD)),
-            Span::styled("Fla", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
-            Span::styled("re", Style::default().fg(value).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Orbit",
+                Style::default().fg(value).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "Fla",
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "re",
+                Style::default().fg(value).add_modifier(Modifier::BOLD),
+            ),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled(format!("  {}", app.user_display), Style::default().fg(value)),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                if app.email.is_empty() { "".into() } else { format!("  {}", app.email) },
-                Style::default().fg(label),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                format!("  ${:.2} {}", app.balance, app.currency),
-                Style::default().fg(accent),
-            ),
-        ]),
+        Line::from(vec![Span::styled(
+            format!("  {}", app.user_display),
+            Style::default().fg(value),
+        )]),
+        Line::from(vec![Span::styled(
+            if app.email.is_empty() {
+                "".into()
+            } else {
+                format!("  {}", app.email)
+            },
+            Style::default().fg(label),
+        )]),
+        Line::from(vec![Span::styled(
+            format!("  ${:.2} {}", app.balance, app.currency),
+            Style::default().fg(accent),
+        )]),
     ];
     let top = Paragraph::new(top_lines);
     frame.render_widget(top, sections[0]);
@@ -184,11 +193,17 @@ fn render_sidebar(frame: &mut Frame, app: &App, area: Rect) {
             let line = Line::from(vec![
                 Span::styled(
                     format!("  {} ", item.icon),
-                    Style::default().fg(accent).bg(bg_nav_active).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(accent)
+                        .bg(bg_nav_active)
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
                     item.label.to_string(),
-                    Style::default().fg(accent).bg(bg_nav_active).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(accent)
+                        .bg(bg_nav_active)
+                        .add_modifier(Modifier::BOLD),
                 ),
             ]);
             frame.render_widget(Paragraph::new(line), item_rect);
@@ -214,7 +229,8 @@ fn render_sidebar(frame: &mut Frame, app: &App, area: Rect) {
         .split(bottom);
 
     let sep_line = Paragraph::new(Line::from(Span::styled(
-        " \u{2500}".to_string() + &"\u{2500}".repeat(bottom_parts[0].width.saturating_sub(2) as usize),
+        " \u{2500}".to_string()
+            + &"\u{2500}".repeat(bottom_parts[0].width.saturating_sub(2) as usize),
         Style::default().fg(border_dim),
     )));
     frame.render_widget(sep_line, bottom_parts[0]);
@@ -223,12 +239,15 @@ fn render_sidebar(frame: &mut Frame, app: &App, area: Rect) {
         Span::styled("  \u{f53f} ", Style::default().fg(label)),
         Span::styled("Theme", Style::default().fg(label)),
         Span::styled(
-            format!("{:>w$}", app.theme.label(), w = (bottom_parts[1].width as usize).saturating_sub(11)),
+            format!(
+                "{:>w$}",
+                app.theme.label(),
+                w = (bottom_parts[1].width as usize).saturating_sub(11)
+            ),
             Style::default().fg(app.theme.dot_color()),
         ),
     ]));
     frame.render_widget(theme_widget, bottom_parts[1]);
-
 }
 fn render_main(frame: &mut Frame, app: &App, area: Rect) {
     match app.section {
@@ -268,10 +287,7 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
     theme!(app => bg, label, border_dim, value, accent);
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Min(30),
-            Constraint::Length(32),
-        ])
+        .constraints([Constraint::Min(30), Constraint::Length(32)])
         .split(area);
 
     let lines = vec![
@@ -290,21 +306,15 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
                 Style::default().fg(value).add_modifier(Modifier::BOLD),
             ),
         ]),
-        Line::from(vec![
-            Span::styled(
-                "  Here's what's happening with your services.",
-                Style::default().fg(label),
-            ),
-        ]),
+        Line::from(vec![Span::styled(
+            "  Here's what's happening with your services.",
+            Style::default().fg(label),
+        )]),
     ];
     let header = Paragraph::new(lines).style(Style::default().bg(bg));
     frame.render_widget(header, cols[0]);
 
-    let btn_lines = vec![
-        Line::from(""),
-        Line::from(""),
-        Line::from(""),
-    ];
+    let btn_lines = vec![Line::from(""), Line::from(""), Line::from("")];
     let btns = Paragraph::new(btn_lines)
         .style(Style::default().bg(bg))
         .alignment(Alignment::Right);
@@ -333,10 +343,7 @@ fn render_balance_bar(frame: &mut Frame, app: &App, area: Rect) {
                 format!("${:.2}", app.balance),
                 Style::default().fg(value).add_modifier(Modifier::BOLD),
             ),
-            Span::styled(
-                format!(" {}", app.currency),
-                Style::default().fg(label),
-            ),
+            Span::styled(format!(" {}", app.currency), Style::default().fg(label)),
         ]),
     ];
     frame.render_widget(Paragraph::new(left_lines), cols[0]);
@@ -347,44 +354,49 @@ fn render_profile_bar(frame: &mut Frame, app: &App, area: Rect) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let mut spans_line1: Vec<Span> = vec![
-        Span::styled("  \u{f2bb} ", Style::default().fg(accent)),
-    ];
+    let mut spans_line1: Vec<Span> = vec![Span::styled("  \u{f2bb} ", Style::default().fg(accent))];
     if !app.wallet_address.is_empty() {
         spans_line1.push(Span::styled("Wallet: ", Style::default().fg(label)));
-        spans_line1.push(Span::styled(&app.wallet_address, Style::default().fg(value)));
+        spans_line1.push(Span::styled(
+            &app.wallet_address,
+            Style::default().fg(value),
+        ));
     }
     if !app.payment_wallet_address.is_empty() {
         spans_line1.push(Span::styled("    Payment: ", Style::default().fg(label)));
-        spans_line1.push(Span::styled(&app.payment_wallet_address, Style::default().fg(value)));
+        spans_line1.push(Span::styled(
+            &app.payment_wallet_address,
+            Style::default().fg(value),
+        ));
     }
 
-    let mut spans_line2: Vec<Span> = vec![
-        Span::styled("    ", Style::default()),
-    ];
+    let mut spans_line2: Vec<Span> = vec![Span::styled("    ", Style::default())];
     if !app.created_at.is_empty() && app.created_at != "—" {
-        spans_line2.push(Span::styled(format!("Member since: {}", app.created_at), Style::default().fg(label)));
+        spans_line2.push(Span::styled(
+            format!("Member since: {}", app.created_at),
+            Style::default().fg(label),
+        ));
     }
 
-    let lines = vec![
-        Line::from(spans_line1),
-        Line::from(spans_line2),
-    ];
+    let lines = vec![Line::from(spans_line1), Line::from(spans_line2)];
     frame.render_widget(Paragraph::new(lines), inner);
 }
 fn render_cards_row(frame: &mut Frame, app: &App, area: Rect) {
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(55),
-            Constraint::Percentage(45),
-        ])
+        .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
         .split(area);
     render_service_card(frame, app, cols[0]);
     render_invoices_card(frame, app, cols[1]);
 }
 
-fn card_block(title: &str, focused: bool, accent: Color, border_dim: Color, bg_card: Color) -> Block<'_> {
+fn card_block(
+    title: &str,
+    focused: bool,
+    accent: Color,
+    border_dim: Color,
+    bg_card: Color,
+) -> Block<'_> {
     let border_color = if focused { accent } else { border_dim };
     let mut block = Block::default()
         .borders(Borders::ALL)
@@ -408,36 +420,28 @@ fn render_service_card(frame: &mut Frame, app: &App, area: Rect) {
     let card_height = inner.height;
     let mut lines = vec![
         Line::from(""),
-        Line::from(vec![
-            Span::styled(
-                format!("  {}", s.key_name),
-                Style::default().fg(accent).add_modifier(Modifier::BOLD),
-            ),
-        ]),
+        Line::from(vec![Span::styled(
+            format!("  {}", s.key_name),
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+        )]),
         Line::from(""),
         Line::from(Span::styled("  License Key", Style::default().fg(label))),
-        Line::from(vec![
-            Span::styled(
-                format!("  {}", s.license_key),
-                Style::default().fg(value).add_modifier(Modifier::BOLD),
-            ),
-        ]),
+        Line::from(vec![Span::styled(
+            format!("  {}", s.license_key),
+            Style::default().fg(value).add_modifier(Modifier::BOLD),
+        )]),
         Line::from(""),
         Line::from(Span::styled("  Issue Date", Style::default().fg(label))),
-        Line::from(vec![
-            Span::styled(
-                format!("  {}", s.issue_date),
-                Style::default().fg(value).add_modifier(Modifier::BOLD),
-            ),
-        ]),
+        Line::from(vec![Span::styled(
+            format!("  {}", s.issue_date),
+            Style::default().fg(value).add_modifier(Modifier::BOLD),
+        )]),
         Line::from(""),
         Line::from(Span::styled("  Next Renewal", Style::default().fg(label))),
-        Line::from(vec![
-            Span::styled(
-                format!("  {}", s.renewal_date),
-                Style::default().fg(value).add_modifier(Modifier::BOLD),
-            ),
-        ]),
+        Line::from(vec![Span::styled(
+            format!("  {}", s.renewal_date),
+            Style::default().fg(value).add_modifier(Modifier::BOLD),
+        )]),
     ];
 
     let used = lines.len() as u16;
@@ -447,9 +451,10 @@ fn render_service_card(frame: &mut Frame, app: &App, area: Rect) {
         }
     }
     lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::styled("  [ View Details ] ", Style::default().fg(accent)),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        "  [ View Details ] ",
+        Style::default().fg(accent),
+    )]));
 
     frame.render_widget(Paragraph::new(lines), inner);
 }
@@ -553,28 +558,35 @@ fn render_profile_view(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled("  \u{25a3}\u{25a3} ", Style::default().fg(label)),
             Span::styled("Dashboard", Style::default().fg(label)),
             Span::styled(" > ", Style::default().fg(border_dim)),
-            Span::styled("Profile", Style::default().fg(value).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Profile",
+                Style::default().fg(value).add_modifier(Modifier::BOLD),
+            ),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  Profile", Style::default().fg(value).add_modifier(Modifier::BOLD)),
-        ]),
+        Line::from(vec![Span::styled(
+            "  Profile",
+            Style::default().fg(value).add_modifier(Modifier::BOLD),
+        )]),
     ];
-    frame.render_widget(Paragraph::new(header).style(Style::default().bg(bg)), layout[0]);
+    frame.render_widget(
+        Paragraph::new(header).style(Style::default().bg(bg)),
+        layout[0],
+    );
 
     let mut lines: Vec<Line> = Vec::new();
 
     card_top(&mut lines, cw, border_dim);
     lines.push(Line::from(vec![
         Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
-        Span::styled("Personal Details", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Personal Details",
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+        ),
     ]));
     card_empty(&mut lines, border_dim);
 
-    let fields: Vec<(&str, &str)> = vec![
-        ("Full Name", &app.user_display),
-        ("Email", &app.email),
-    ];
+    let fields: Vec<(&str, &str)> = vec![("Full Name", &app.user_display), ("Email", &app.email)];
     for (lbl, val) in &fields {
         lines.push(Line::from(vec![
             Span::styled("  \u{2502}   ", Style::default().fg(border_dim)),
@@ -592,14 +604,20 @@ fn render_profile_view(frame: &mut Frame, app: &App, area: Rect) {
     if !app.payment_wallet_address.is_empty() {
         lines.push(Line::from(vec![
             Span::styled("  \u{2502}   ", Style::default().fg(border_dim)),
-            Span::styled(format!("{:<20}", "Payment Wallet"), Style::default().fg(label)),
+            Span::styled(
+                format!("{:<20}", "Payment Wallet"),
+                Style::default().fg(label),
+            ),
             Span::styled(&app.payment_wallet_address, Style::default().fg(value)),
         ]));
     }
     if !app.created_at.is_empty() && app.created_at != "\u{2014}" {
         lines.push(Line::from(vec![
             Span::styled("  \u{2502}   ", Style::default().fg(border_dim)),
-            Span::styled(format!("{:<20}", "Member Since"), Style::default().fg(label)),
+            Span::styled(
+                format!("{:<20}", "Member Since"),
+                Style::default().fg(label),
+            ),
             Span::styled(&app.created_at, Style::default().fg(value)),
         ]));
     }
@@ -609,7 +627,10 @@ fn render_profile_view(frame: &mut Frame, app: &App, area: Rect) {
     card_top(&mut lines, cw, border_dim);
     lines.push(Line::from(vec![
         Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
-        Span::styled("Connected Accounts", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Connected Accounts",
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+        ),
     ]));
     card_empty(&mut lines, border_dim);
 
@@ -626,12 +647,19 @@ fn render_profile_view(frame: &mut Frame, app: &App, area: Rect) {
                 _ => "\u{f0c1}",
             };
             let status_color = if ca.connected { success } else { label };
-            let status_label = if ca.connected { "\u{2713} Connected" } else { "\u{2717} Not connected" };
+            let status_label = if ca.connected {
+                "\u{2713} Connected"
+            } else {
+                "\u{2717} Not connected"
+            };
 
             lines.push(Line::from(vec![
                 Span::styled("  \u{2502}   ", Style::default().fg(border_dim)),
                 Span::styled(format!("{} ", icon), Style::default().fg(accent)),
-                Span::styled(format!("{:<12}", ca.provider), Style::default().fg(value).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    format!("{:<12}", ca.provider),
+                    Style::default().fg(value).add_modifier(Modifier::BOLD),
+                ),
                 Span::styled(status_label, Style::default().fg(status_color)),
             ]));
             card_empty(&mut lines, border_dim);
@@ -647,14 +675,23 @@ fn render_profile_view(frame: &mut Frame, app: &App, area: Rect) {
     if has_status {
         let success_color = app.theme.palette().success;
         if let Some(ref msg) = app.status_message {
-            let color = if app.status_is_error { Color::Rgb(200, 80, 80) } else { success_color };
-            let icon = if app.status_is_error { "\u{2717} " } else { "\u{2713} " };
+            let color = if app.status_is_error {
+                Color::Rgb(200, 80, 80)
+            } else {
+                success_color
+            };
+            let icon = if app.status_is_error {
+                "\u{2717} "
+            } else {
+                "\u{2713} "
+            };
             frame.render_widget(
                 Paragraph::new(Line::from(vec![
                     Span::styled("  ", Style::default()),
                     Span::styled(icon, Style::default().fg(color)),
                     Span::styled(msg.as_str(), Style::default().fg(color)),
-                ])).style(Style::default().bg(bg)),
+                ]))
+                .style(Style::default().bg(bg)),
                 layout[2],
             );
         }
@@ -668,11 +705,18 @@ fn render_profile_view(frame: &mut Frame, app: &App, area: Rect) {
     ];
     let mut spans: Vec<Span> = vec![Span::styled(" ", Style::default())];
     for (key, desc) in keys {
-        spans.push(Span::styled(format!(" {key} "), Style::default().fg(accent).add_modifier(Modifier::BOLD)));
-        spans.push(Span::styled(format!("{desc}  "), Style::default().fg(label)));
+        spans.push(Span::styled(
+            format!(" {key} "),
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::styled(
+            format!("{desc}  "),
+            Style::default().fg(label),
+        ));
     }
     frame.render_widget(
-        Paragraph::new(Line::from(spans)).style(Style::default().bg(app.theme.palette().bg_sidebar)),
+        Paragraph::new(Line::from(spans))
+            .style(Style::default().bg(app.theme.palette().bg_sidebar)),
         layout[3],
     );
 }
@@ -702,14 +746,21 @@ fn render_profile_edit(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled(" > ", Style::default().fg(border_dim)),
             Span::styled("Profile", Style::default().fg(label)),
             Span::styled(" > ", Style::default().fg(border_dim)),
-            Span::styled("Edit", Style::default().fg(value).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Edit",
+                Style::default().fg(value).add_modifier(Modifier::BOLD),
+            ),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  Edit Profile", Style::default().fg(value).add_modifier(Modifier::BOLD)),
-        ]),
+        Line::from(vec![Span::styled(
+            "  Edit Profile",
+            Style::default().fg(value).add_modifier(Modifier::BOLD),
+        )]),
     ];
-    frame.render_widget(Paragraph::new(header).style(Style::default().bg(bg)), layout[0]);
+    frame.render_widget(
+        Paragraph::new(header).style(Style::default().bg(bg)),
+        layout[0],
+    );
 
     let form_area = shrink(layout[1], 2, 2, 0, 0);
     let cw = (form_area.width as usize).saturating_sub(4);
@@ -721,9 +772,16 @@ fn render_profile_edit(frame: &mut Frame, app: &App, area: Rect) {
 
     let mut lines: Vec<Line> = Vec::new();
 
-    lines.push(Line::from(vec![
-        Span::styled("  Full Name", Style::default().fg(if name_active { accent } else { label }).add_modifier(if name_active { Modifier::BOLD } else { Modifier::empty() })),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        "  Full Name",
+        Style::default()
+            .fg(if name_active { accent } else { label })
+            .add_modifier(if name_active {
+                Modifier::BOLD
+            } else {
+                Modifier::empty()
+            }),
+    )]));
     lines.push(Line::from(vec![
         Span::styled("  \u{256d}", Style::default().fg(name_border)),
         Span::styled("\u{2500}".repeat(cw), Style::default().fg(name_border)),
@@ -731,7 +789,11 @@ fn render_profile_edit(frame: &mut Frame, app: &App, area: Rect) {
     ]));
     {
         let buf = &app.profile_name_buf;
-        let cursor = if name_active { app.profile_cursor } else { buf.len() };
+        let cursor = if name_active {
+            app.profile_cursor
+        } else {
+            buf.len()
+        };
         let (before, after) = buf.split_at(cursor.min(buf.len()));
         let mut spans = vec![
             Span::styled("  \u{2502} ", Style::default().fg(name_border)),
@@ -750,9 +812,16 @@ fn render_profile_edit(frame: &mut Frame, app: &App, area: Rect) {
     ]));
     lines.push(Line::from(""));
 
-    lines.push(Line::from(vec![
-        Span::styled("  Payment Wallet Address", Style::default().fg(if wallet_active { accent } else { label }).add_modifier(if wallet_active { Modifier::BOLD } else { Modifier::empty() })),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        "  Payment Wallet Address",
+        Style::default()
+            .fg(if wallet_active { accent } else { label })
+            .add_modifier(if wallet_active {
+                Modifier::BOLD
+            } else {
+                Modifier::empty()
+            }),
+    )]));
     lines.push(Line::from(vec![
         Span::styled("  \u{256d}", Style::default().fg(wallet_border)),
         Span::styled("\u{2500}".repeat(cw), Style::default().fg(wallet_border)),
@@ -760,7 +829,11 @@ fn render_profile_edit(frame: &mut Frame, app: &App, area: Rect) {
     ]));
     {
         let buf = &app.profile_wallet_buf;
-        let cursor = if wallet_active { app.profile_cursor } else { buf.len() };
+        let cursor = if wallet_active {
+            app.profile_cursor
+        } else {
+            buf.len()
+        };
         let (before, after) = buf.split_at(cursor.min(buf.len()));
         let mut spans = vec![
             Span::styled("  \u{2502} ", Style::default().fg(wallet_border)),
@@ -778,19 +851,31 @@ fn render_profile_edit(frame: &mut Frame, app: &App, area: Rect) {
         Span::styled("\u{256f}", Style::default().fg(wallet_border)),
     ]));
 
-    frame.render_widget(Paragraph::new(lines).style(Style::default().bg(bg)), form_area);
+    frame.render_widget(
+        Paragraph::new(lines).style(Style::default().bg(bg)),
+        form_area,
+    );
 
     if has_status {
         let success_color = app.theme.palette().success;
         if let Some(ref msg) = app.status_message {
-            let color = if app.status_is_error { Color::Rgb(200, 80, 80) } else { success_color };
-            let icon = if app.status_is_error { "\u{2717} " } else { "\u{2713} " };
+            let color = if app.status_is_error {
+                Color::Rgb(200, 80, 80)
+            } else {
+                success_color
+            };
+            let icon = if app.status_is_error {
+                "\u{2717} "
+            } else {
+                "\u{2713} "
+            };
             frame.render_widget(
                 Paragraph::new(Line::from(vec![
                     Span::styled("  ", Style::default()),
                     Span::styled(icon, Style::default().fg(color)),
                     Span::styled(msg.as_str(), Style::default().fg(color)),
-                ])).style(Style::default().bg(bg)),
+                ]))
+                .style(Style::default().bg(bg)),
                 layout[2],
             );
         }
@@ -803,11 +888,18 @@ fn render_profile_edit(frame: &mut Frame, app: &App, area: Rect) {
     ];
     let mut spans: Vec<Span> = vec![Span::styled(" ", Style::default())];
     for (key, desc) in keys {
-        spans.push(Span::styled(format!(" {key} "), Style::default().fg(accent).add_modifier(Modifier::BOLD)));
-        spans.push(Span::styled(format!("{desc}  "), Style::default().fg(label)));
+        spans.push(Span::styled(
+            format!(" {key} "),
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::styled(
+            format!("{desc}  "),
+            Style::default().fg(label),
+        ));
     }
     frame.render_widget(
-        Paragraph::new(Line::from(spans)).style(Style::default().bg(app.theme.palette().bg_sidebar)),
+        Paragraph::new(Line::from(spans))
+            .style(Style::default().bg(app.theme.palette().bg_sidebar)),
         layout[3],
     );
 }
@@ -815,8 +907,7 @@ fn render_profile_edit(frame: &mut Frame, app: &App, area: Rect) {
 fn render_main_invoices(frame: &mut Frame, app: &App, area: Rect) {
     let has_status = app.status_message.is_some() && app.section == Section::Invoices;
     let has_confirm = app.confirm.is_some() && app.section == Section::Invoices;
-    let extra_rows = if has_status { 1 } else { 0 }
-        + if has_confirm { 3 } else { 0 };
+    let extra_rows = if has_status { 1 } else { 0 } + if has_confirm { 3 } else { 0 };
 
     let layout = Layout::default()
         .direction(Direction::Vertical)
@@ -843,8 +934,16 @@ fn render_main_invoices(frame: &mut Frame, app: &App, area: Rect) {
         let mut overlay_lines: Vec<Line> = Vec::new();
 
         if let Some(ref msg) = app.status_message {
-            let color = if app.status_is_error { Color::Rgb(200, 80, 80) } else { success_color };
-            let icon = if app.status_is_error { "\u{2717} " } else { "\u{2713} " };
+            let color = if app.status_is_error {
+                Color::Rgb(200, 80, 80)
+            } else {
+                success_color
+            };
+            let icon = if app.status_is_error {
+                "\u{2717} "
+            } else {
+                "\u{2713} "
+            };
             overlay_lines.push(Line::from(vec![
                 Span::styled("  ", Style::default()),
                 Span::styled(icon, Style::default().fg(color)),
@@ -854,7 +953,9 @@ fn render_main_invoices(frame: &mut Frame, app: &App, area: Rect) {
 
         if let Some(ref kind) = app.confirm {
             let prompt = match kind {
-                super::app::ConfirmKind::PayInvoice => "Pay this invoice with your account balance?",
+                super::app::ConfirmKind::PayInvoice => {
+                    "Pay this invoice with your account balance?"
+                }
                 _ => "Are you sure?",
             };
             overlay_lines.push(Line::from(""));
@@ -879,10 +980,7 @@ fn render_invoices_header_section(frame: &mut Frame, app: &App, area: Rect) {
     theme!(app => bg, label, border_dim, value, accent);
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Min(30),
-            Constraint::Length(20),
-        ])
+        .constraints([Constraint::Min(30), Constraint::Length(20)])
         .split(area);
 
     let lines = vec![
@@ -893,21 +991,20 @@ fn render_invoices_header_section(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled("> ", Style::default().fg(border_dim)),
             Span::styled("Invoices ", Style::default().fg(label)),
             Span::styled("> ", Style::default().fg(border_dim)),
-            Span::styled("Invoices", Style::default().fg(value).add_modifier(Modifier::BOLD)),
-        ]),
-        Line::from(""),
-        Line::from(vec![
             Span::styled(
-                "  Invoices",
+                "Invoices",
                 Style::default().fg(value).add_modifier(Modifier::BOLD),
             ),
         ]),
-        Line::from(vec![
-            Span::styled(
-                "  View and manage all your invoices and billing history.",
-                Style::default().fg(label),
-            ),
-        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Invoices",
+            Style::default().fg(value).add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![Span::styled(
+            "  View and manage all your invoices and billing history.",
+            Style::default().fg(label),
+        )]),
     ];
     let header = Paragraph::new(lines).style(Style::default().bg(bg));
     frame.render_widget(header, cols[0]);
@@ -973,31 +1070,24 @@ fn render_invoices_empty_card(frame: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(""));
     }
 
-    lines.push(Line::from(vec![
-        Span::styled(
-            "[$]",
-            Style::default().fg(label),
-        ),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        "[$]",
+        Style::default().fg(label),
+    )]));
     lines.push(Line::from(""));
 
-    lines.push(Line::from(vec![
-        Span::styled(
-            "No Invoices Found",
-            Style::default().fg(accent).add_modifier(Modifier::BOLD),
-        ),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        "No Invoices Found",
+        Style::default().fg(accent).add_modifier(Modifier::BOLD),
+    )]));
 
     lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::styled(
-            "You don't have any invoices yet. Missing an invoice? Contact us.",
-            Style::default().fg(label),
-        ),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        "You don't have any invoices yet. Missing an invoice? Contact us.",
+        Style::default().fg(label),
+    )]));
 
-    let content = Paragraph::new(lines)
-        .alignment(Alignment::Center);
+    let content = Paragraph::new(lines).alignment(Alignment::Center);
     frame.render_widget(content, inner);
 }
 
@@ -1008,17 +1098,17 @@ fn render_invoices_list(frame: &mut Frame, app: &App, area: Rect) {
 
     let mut lines: Vec<Line> = Vec::new();
 
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!("  {:<20} {:<12} {:<14} {}",
-                "REFERENCE", "AMOUNT", "STATUS", "DATE"
-            ),
-            Style::default().fg(label),
+    lines.push(Line::from(vec![Span::styled(
+        format!(
+            "  {:<20} {:<12} {:<14} {}",
+            "REFERENCE", "AMOUNT", "STATUS", "DATE"
         ),
-    ]));
-    lines.push(Line::from(vec![
-        Span::styled(format!("  {}", "\u{2500}".repeat(cw)), Style::default().fg(border_dim)),
-    ]));
+        Style::default().fg(label),
+    )]));
+    lines.push(Line::from(vec![Span::styled(
+        format!("  {}", "\u{2500}".repeat(cw)),
+        Style::default().fg(border_dim),
+    )]));
 
     for (i, inv) in app.invoices.iter().enumerate() {
         let is_selected = i == app.invoices_selected;
@@ -1034,24 +1124,21 @@ fn render_invoices_list(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled(marker, Style::default().fg(accent)),
             Span::styled(format!("{:<20}", inv.id), Style::default().fg(row_fg)),
             Span::styled(format!("{:<12}", inv.amount), Style::default().fg(row_fg)),
-            Span::styled(format!("{:<14}", status_label), Style::default().fg(status_color)),
+            Span::styled(
+                format!("{:<14}", status_label),
+                Style::default().fg(status_color),
+            ),
             Span::styled(&inv.date, Style::default().fg(label)),
         ]));
     }
 
-    frame.render_widget(
-        Paragraph::new(lines).style(Style::default().bg(bg)),
-        padded,
-    );
+    frame.render_widget(Paragraph::new(lines).style(Style::default().bg(bg)), padded);
 }
 
 fn render_footer_invoices(frame: &mut Frame, app: &App, area: Rect) {
     theme!(app => accent, label, bg_sidebar);
     let keys: Vec<(&str, &str)> = if app.confirm.is_some() {
-        vec![
-            ("[y]", "Confirm"),
-            ("[any]", "Cancel"),
-        ]
+        vec![("[y]", "Confirm"), ("[any]", "Cancel")]
     } else {
         let mut k = vec![
             ("[q]", "Quit"),
@@ -1081,8 +1168,7 @@ fn render_footer_invoices(frame: &mut Frame, app: &App, area: Rect) {
         ));
     }
 
-    let footer = Paragraph::new(Line::from(spans))
-        .style(Style::default().bg(bg_sidebar));
+    let footer = Paragraph::new(Line::from(spans)).style(Style::default().bg(bg_sidebar));
     frame.render_widget(footer, area);
 }
 fn render_main_services(frame: &mut Frame, app: &App, area: Rect) {
@@ -1110,10 +1196,7 @@ fn render_services_header(frame: &mut Frame, app: &App, area: Rect) {
     theme!(app => bg, label, border_dim, value, accent);
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Min(30),
-            Constraint::Length(20),
-        ])
+        .constraints([Constraint::Min(30), Constraint::Length(20)])
         .split(area);
 
     let lines = vec![
@@ -1124,21 +1207,20 @@ fn render_services_header(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled("> ", Style::default().fg(border_dim)),
             Span::styled("Services ", Style::default().fg(label)),
             Span::styled("> ", Style::default().fg(border_dim)),
-            Span::styled("Your Services", Style::default().fg(value).add_modifier(Modifier::BOLD)),
-        ]),
-        Line::from(""),
-        Line::from(vec![
             Span::styled(
-                "  Your Services",
+                "Your Services",
                 Style::default().fg(value).add_modifier(Modifier::BOLD),
             ),
         ]),
-        Line::from(vec![
-            Span::styled(
-                "  Manage your active services and renewals.",
-                Style::default().fg(label),
-            ),
-        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Your Services",
+            Style::default().fg(value).add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![Span::styled(
+            "  Manage your active services and renewals.",
+            Style::default().fg(label),
+        )]),
     ];
     let header = Paragraph::new(lines).style(Style::default().bg(bg));
     frame.render_widget(header, cols[0]);
@@ -1183,7 +1265,9 @@ fn render_services_header(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_services_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
     theme!(app => bg, green_dot, value, label);
-    let active_count = app.services.iter()
+    let active_count = app
+        .services
+        .iter()
         .filter(|s| s.status == ServiceStatus::Active)
         .count();
     let total = app.services.len();
@@ -1197,10 +1281,7 @@ fn render_services_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
                 format!("Active: {}", active_count),
                 Style::default().fg(value).add_modifier(Modifier::BOLD),
             ),
-            Span::styled(
-                format!("   {} total", total),
-                Style::default().fg(label),
-            ),
+            Span::styled(format!("   {} total", total), Style::default().fg(label)),
         ]),
     ];
     frame.render_widget(
@@ -1235,7 +1316,14 @@ fn render_services_table(frame: &mut Frame, app: &App, area: Rect) {
         .split(inner);
 
     let header_y = inner.y;
-    let header_labels = ["SERVICE", "LICENSE KEY", "STATUS", "ISSUE DATE", "RENEWAL", "ACTIONS"];
+    let header_labels = [
+        "SERVICE",
+        "LICENSE KEY",
+        "STATUS",
+        "ISSUE DATE",
+        "RENEWAL",
+        "ACTIONS",
+    ];
     for (i, lbl) in header_labels.iter().enumerate() {
         let rect = Rect {
             x: col_layout[i].x,
@@ -1300,13 +1388,13 @@ fn render_services_table(frame: &mut Frame, app: &App, area: Rect) {
         frame.render_widget(
             Paragraph::new(Line::from(vec![
                 Span::styled("  ", Style::default().bg(row_bg)),
-                Span::styled(
-                    "\u{25c8} ",
-                    Style::default().fg(accent).bg(row_bg),
-                ),
+                Span::styled("\u{25c8} ", Style::default().fg(accent).bg(row_bg)),
                 Span::styled(
                     svc.name.clone(),
-                    Style::default().fg(value).bg(row_bg).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(value)
+                        .bg(row_bg)
+                        .add_modifier(Modifier::BOLD),
                 ),
             ])),
             svc_rect,
@@ -1324,10 +1412,7 @@ fn render_services_table(frame: &mut Frame, app: &App, area: Rect) {
                     format!("  {}", svc.license_key),
                     Style::default().fg(value).bg(row_bg),
                 ),
-                Span::styled(
-                    " \u{f0c5}",
-                    Style::default().fg(label).bg(row_bg),
-                ),
+                Span::styled(" \u{f0c5}", Style::default().fg(label).bg(row_bg)),
             ])),
             key_rect,
         );
@@ -1393,12 +1478,12 @@ fn render_services_table(frame: &mut Frame, app: &App, area: Rect) {
                 Span::styled("  ", Style::default().bg(row_bg)),
                 Span::styled(
                     " View ",
-                    Style::default().fg(bg).bg(accent).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(bg)
+                        .bg(accent)
+                        .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(
-                    "  \u{22ee}",
-                    Style::default().fg(label).bg(row_bg),
-                ),
+                Span::styled("  \u{22ee}", Style::default().fg(label).bg(row_bg)),
             ])),
             actions_rect,
         );
@@ -1407,8 +1492,7 @@ fn render_services_table(frame: &mut Frame, app: &App, area: Rect) {
 fn render_services_grid(frame: &mut Frame, app: &App, area: Rect) {
     theme!(app => bg, bg_card, accent, border_dim, label, value, success, yellow);
     if app.services.is_empty() {
-        let empty = Paragraph::new("  No services found.")
-            .style(Style::default().fg(label).bg(bg));
+        let empty = Paragraph::new("  No services found.").style(Style::default().fg(label).bg(bg));
         frame.render_widget(empty, area);
         return;
     }
@@ -1455,12 +1539,10 @@ fn render_services_grid(frame: &mut Frame, app: &App, area: Rect) {
         };
 
         let lines = vec![
-            Line::from(vec![
-                Span::styled(
-                    format!("  {}", svc.name),
-                    Style::default().fg(accent).add_modifier(Modifier::BOLD),
-                ),
-            ]),
+            Line::from(vec![Span::styled(
+                format!("  {}", svc.name),
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
+            )]),
             Line::from(vec![
                 Span::styled("  ", Style::default()),
                 Span::styled(
@@ -1469,25 +1551,23 @@ fn render_services_grid(frame: &mut Frame, app: &App, area: Rect) {
                 ),
             ]),
             Line::from(""),
-            Line::from(vec![
-                Span::styled("  License Key", Style::default().fg(label)),
-            ]),
-            Line::from(vec![
-                Span::styled(
-                    format!("  {}", svc.license_key),
-                    Style::default().fg(value).add_modifier(Modifier::BOLD),
-                ),
-            ]),
+            Line::from(vec![Span::styled(
+                "  License Key",
+                Style::default().fg(label),
+            )]),
+            Line::from(vec![Span::styled(
+                format!("  {}", svc.license_key),
+                Style::default().fg(value).add_modifier(Modifier::BOLD),
+            )]),
             Line::from(""),
-            Line::from(vec![
-                Span::styled("  Issue Date       ", Style::default().fg(label)),
-            ]),
-            Line::from(vec![
-                Span::styled(
-                    format!("  {:<16}   Next: {}", svc.issue_date, svc.renewal_date),
-                    Style::default().fg(value).add_modifier(Modifier::BOLD),
-                ),
-            ]),
+            Line::from(vec![Span::styled(
+                "  Issue Date       ",
+                Style::default().fg(label),
+            )]),
+            Line::from(vec![Span::styled(
+                format!("  {:<16}   Next: {}", svc.issue_date, svc.renewal_date),
+                Style::default().fg(value).add_modifier(Modifier::BOLD),
+            )]),
         ];
 
         let content = Paragraph::new(lines).style(Style::default().bg(bg_card));
@@ -1497,8 +1577,7 @@ fn render_services_grid(frame: &mut Frame, app: &App, area: Rect) {
 fn render_services_compact(frame: &mut Frame, app: &App, area: Rect) {
     theme!(app => bg, bg_card, accent, border_dim, label, value, success, yellow);
     if app.services.is_empty() {
-        let empty = Paragraph::new("  No services found.")
-            .style(Style::default().fg(label).bg(bg));
+        let empty = Paragraph::new("  No services found.").style(Style::default().fg(label).bg(bg));
         frame.render_widget(empty, area);
         return;
     }
@@ -1550,19 +1629,18 @@ fn render_services_compact(frame: &mut Frame, app: &App, area: Rect) {
             ),
         ]);
 
-        let line2 = Line::from(vec![
-            Span::styled(
-                format!("  {}", svc.license_key),
-                Style::default().fg(label),
-            ),
-        ]);
+        let line2 = Line::from(vec![Span::styled(
+            format!("  {}", svc.license_key),
+            Style::default().fg(label),
+        )]);
 
-        let line3 = Line::from(vec![
-            Span::styled(
-                format!("  Issued: {}    Renewal: {}", svc.issue_date, svc.renewal_date),
-                Style::default().fg(label),
+        let line3 = Line::from(vec![Span::styled(
+            format!(
+                "  Issued: {}    Renewal: {}",
+                svc.issue_date, svc.renewal_date
             ),
-        ]);
+            Style::default().fg(label),
+        )]);
 
         let lines = if inner.height >= 3 {
             vec![line1, line2, line3]
@@ -1599,23 +1677,25 @@ fn render_main_api_keys(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled("  \u{25a3}\u{25a3} ", Style::default().fg(label)),
             Span::styled("Dashboard", Style::default().fg(label)),
             Span::styled(" > ", Style::default().fg(border_dim)),
-            Span::styled("API Keys", Style::default().fg(value).add_modifier(Modifier::BOLD)),
-        ]),
-        Line::from(""),
-        Line::from(vec![
             Span::styled(
-                "  API Keys",
+                "API Keys",
                 Style::default().fg(value).add_modifier(Modifier::BOLD),
             ),
         ]),
-        Line::from(vec![
-            Span::styled(
-                "  Manage your API keys for accessing OrbitFlare services.",
-                Style::default().fg(label),
-            ),
-        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  API Keys",
+            Style::default().fg(value).add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![Span::styled(
+            "  Manage your API keys for accessing OrbitFlare services.",
+            Style::default().fg(label),
+        )]),
     ];
-    frame.render_widget(Paragraph::new(header_lines).style(Style::default().bg(bg)), layout[0]);
+    frame.render_widget(
+        Paragraph::new(header_lines).style(Style::default().bg(bg)),
+        layout[0],
+    );
 
     let content_area = layout[1];
 
@@ -1661,7 +1741,11 @@ fn render_main_api_keys(frame: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(vec![
             Span::styled("  ", Style::default()),
             Span::styled(
-                format!("{} key{}", app.api_keys.len(), if app.api_keys.len() != 1 { "s" } else { "" }),
+                format!(
+                    "{} key{}",
+                    app.api_keys.len(),
+                    if app.api_keys.len() != 1 { "s" } else { "" }
+                ),
                 Style::default().fg(value).add_modifier(Modifier::BOLD),
             ),
             Span::styled(
@@ -1678,17 +1762,22 @@ fn render_main_api_keys(frame: &mut Frame, app: &App, area: Rect) {
 
             lines.push(Line::from(vec![
                 Span::styled("  \u{256d}", Style::default().fg(key_border_color)),
-                Span::styled(
-                    "\u{2500}".repeat(cw),
-                    Style::default().fg(key_border_color),
-                ),
+                Span::styled("\u{2500}".repeat(cw), Style::default().fg(key_border_color)),
                 Span::styled("\u{256e}", Style::default().fg(key_border_color)),
             ]));
 
             let pointer_color = if is_selected { accent } else { label };
 
-            let status_color = if key.enabled { success } else { Color::Rgb(200, 80, 80) };
-            let status_label = if key.enabled { " \u{23fb} Enabled " } else { " \u{23fb} Disabled " };
+            let status_color = if key.enabled {
+                success
+            } else {
+                Color::Rgb(200, 80, 80)
+            };
+            let status_label = if key.enabled {
+                " \u{23fb} Enabled "
+            } else {
+                " \u{23fb} Disabled "
+            };
             let ips_label = format!(" \u{2616} IPs({}) ", key.ip_count);
 
             lines.push(Line::from(vec![
@@ -1698,22 +1787,13 @@ fn render_main_api_keys(frame: &mut Frame, app: &App, area: Rect) {
                     key.name.clone(),
                     Style::default().fg(value).add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(
-                    format!("  #{}", key.id),
-                    Style::default().fg(label),
-                ),
+                Span::styled(format!("  #{}", key.id), Style::default().fg(label)),
             ]));
 
             lines.push(Line::from(vec![
                 Span::styled("  \u{2502}   ", Style::default().fg(key_border_color)),
-                Span::styled(
-                    key.key_masked.clone(),
-                    Style::default().fg(label),
-                ),
-                Span::styled(
-                    " \u{f0c5}",
-                    Style::default().fg(border_dim),
-                ),
+                Span::styled(key.key_masked.clone(), Style::default().fg(label)),
+                Span::styled(" \u{f0c5}", Style::default().fg(border_dim)),
             ]));
 
             lines.push(Line::from(vec![
@@ -1727,38 +1807,27 @@ fn render_main_api_keys(frame: &mut Frame, app: &App, area: Rect) {
             let btn_pad = cw.saturating_sub(40);
             lines.push(Line::from(vec![
                 Span::styled("  \u{2502} ", Style::default().fg(key_border_color)),
-                Span::styled(
-                    " ".repeat(btn_pad),
-                    Style::default(),
-                ),
-                Span::styled(
-                    status_label,
-                    Style::default().fg(status_color),
-                ),
+                Span::styled(" ".repeat(btn_pad), Style::default()),
+                Span::styled(status_label, Style::default().fg(status_color)),
                 Span::styled("  ", Style::default()),
                 Span::styled(
                     ips_label,
-                    Style::default().fg(accent).bg(if is_expanded { Color::Rgb(20, 35, 45) } else { bg_card }),
+                    Style::default().fg(accent).bg(if is_expanded {
+                        Color::Rgb(20, 35, 45)
+                    } else {
+                        bg_card
+                    }),
                 ),
                 Span::styled("  ", Style::default()),
-                Span::styled(
-                    " \u{21bb} ",
-                    Style::default().fg(label),
-                ),
+                Span::styled(" \u{21bb} ", Style::default().fg(label)),
                 Span::styled("  ", Style::default()),
-                Span::styled(
-                    " \u{f1f8} ",
-                    Style::default().fg(Color::Rgb(200, 80, 80)),
-                ),
+                Span::styled(" \u{f1f8} ", Style::default().fg(Color::Rgb(200, 80, 80))),
             ]));
 
             if is_expanded {
                 lines.push(Line::from(vec![
                     Span::styled("  \u{251c}", Style::default().fg(key_border_color)),
-                    Span::styled(
-                        "\u{2500}".repeat(cw),
-                        Style::default().fg(key_border_color),
-                    ),
+                    Span::styled("\u{2500}".repeat(cw), Style::default().fg(key_border_color)),
                     Span::styled("\u{2524}", Style::default().fg(key_border_color)),
                 ]));
 
@@ -1776,21 +1845,16 @@ fn render_main_api_keys(frame: &mut Frame, app: &App, area: Rect) {
                         Style::default().fg(label),
                     ),
                 ]));
-                lines.push(Line::from(vec![
-                    Span::styled("  \u{2502}", Style::default().fg(key_border_color)),
-                ]));
+                lines.push(Line::from(vec![Span::styled(
+                    "  \u{2502}",
+                    Style::default().fg(key_border_color),
+                )]));
 
                 if key.ip_whitelist.is_empty() {
                     lines.push(Line::from(vec![
                         Span::styled("  \u{2502}   ", Style::default().fg(key_border_color)),
-                        Span::styled(
-                            "No IPs whitelisted  ",
-                            Style::default().fg(label),
-                        ),
-                        Span::styled(
-                            "[a] Add IP",
-                            Style::default().fg(accent),
-                        ),
+                        Span::styled("No IPs whitelisted  ", Style::default().fg(label)),
+                        Span::styled("[a] Add IP", Style::default().fg(accent)),
                     ]));
                 } else {
                     for (ip_idx, ip) in key.ip_whitelist.iter().enumerate() {
@@ -1820,24 +1884,24 @@ fn render_main_api_keys(frame: &mut Frame, app: &App, area: Rect) {
                     }
                 }
 
-                lines.push(Line::from(vec![
-                    Span::styled("  \u{2502}", Style::default().fg(key_border_color)),
-                ]));
+                lines.push(Line::from(vec![Span::styled(
+                    "  \u{2502}",
+                    Style::default().fg(key_border_color),
+                )]));
             }
 
             lines.push(Line::from(vec![
                 Span::styled("  \u{2570}", Style::default().fg(key_border_color)),
-                Span::styled(
-                    "\u{2500}".repeat(cw),
-                    Style::default().fg(key_border_color),
-                ),
+                Span::styled("\u{2500}".repeat(cw), Style::default().fg(key_border_color)),
                 Span::styled("\u{256f}", Style::default().fg(key_border_color)),
             ]));
             lines.push(Line::from(""));
         }
 
         frame.render_widget(
-            Paragraph::new(lines).style(Style::default().bg(bg)).scroll((app.api_keys_scroll, 0)),
+            Paragraph::new(lines)
+                .style(Style::default().bg(bg))
+                .scroll((app.api_keys_scroll, 0)),
             content_area,
         );
     }
@@ -1847,8 +1911,16 @@ fn render_main_api_keys(frame: &mut Frame, app: &App, area: Rect) {
         let mut overlay_lines: Vec<Line> = Vec::new();
 
         if let Some(ref msg) = app.status_message {
-            let color = if app.status_is_error { Color::Rgb(200, 80, 80) } else { success };
-            let icon = if app.status_is_error { "\u{2717} " } else { "\u{2713} " };
+            let color = if app.status_is_error {
+                Color::Rgb(200, 80, 80)
+            } else {
+                success
+            };
+            let icon = if app.status_is_error {
+                "\u{2717} "
+            } else {
+                "\u{2713} "
+            };
             overlay_lines.push(Line::from(vec![
                 Span::styled("  ", Style::default()),
                 Span::styled(icon, Style::default().fg(color)),
@@ -1858,13 +1930,19 @@ fn render_main_api_keys(frame: &mut Frame, app: &App, area: Rect) {
 
         if let Some(ref kind) = app.confirm {
             let prompt = match kind {
-                super::app::ConfirmKind::Regenerate => "Regenerate this API key? This cannot be undone.",
+                super::app::ConfirmKind::Regenerate => {
+                    "Regenerate this API key? This cannot be undone."
+                }
                 super::app::ConfirmKind::Delete => "Delete this API key? This cannot be undone.",
                 super::app::ConfirmKind::RemoveIp => "Remove this IP from the whitelist?",
-                super::app::ConfirmKind::RegenerateLicenseKey => "Regenerate this license key? This cannot be undone.",
+                super::app::ConfirmKind::RegenerateLicenseKey => {
+                    "Regenerate this license key? This cannot be undone."
+                }
                 super::app::ConfirmKind::RemoveLicenseIp => "Remove this IP from the whitelist?",
                 super::app::ConfirmKind::RemoveDomain => "Remove this domain?",
-                super::app::ConfirmKind::PayInvoice => "Pay this invoice with your account balance?",
+                super::app::ConfirmKind::PayInvoice => {
+                    "Pay this invoice with your account balance?"
+                }
             };
             overlay_lines.push(Line::from(""));
             overlay_lines.push(Line::from(vec![
@@ -1906,9 +1984,10 @@ fn render_main_api_keys(frame: &mut Frame, app: &App, area: Rect) {
             height: 1,
         };
         frame.render_widget(
-            Paragraph::new(Line::from(vec![
-                Span::styled(" \u{21bb} Loading... ", Style::default().fg(accent).bg(bg_card)),
-            ])),
+            Paragraph::new(Line::from(vec![Span::styled(
+                " \u{21bb} Loading... ",
+                Style::default().fg(accent).bg(bg_card),
+            )])),
             loading_area,
         );
     }
@@ -1919,15 +1998,9 @@ fn render_main_api_keys(frame: &mut Frame, app: &App, area: Rect) {
 fn render_footer_api_keys(frame: &mut Frame, app: &App, area: Rect) {
     theme!(app => accent, label, bg_sidebar);
     let keys: Vec<(&str, &str)> = if app.input_mode.is_some() {
-        vec![
-            ("[Esc]", "Cancel"),
-            ("[Enter]", "Submit"),
-        ]
+        vec![("[Esc]", "Cancel"), ("[Enter]", "Submit")]
     } else if app.confirm.is_some() {
-        vec![
-            ("[y]", "Confirm"),
-            ("[any]", "Cancel"),
-        ]
+        vec![("[y]", "Confirm"), ("[any]", "Cancel")]
     } else if app.api_keys_expanded.is_some() {
         vec![
             ("[q]", "Quit"),
@@ -1967,8 +2040,7 @@ fn render_footer_api_keys(frame: &mut Frame, app: &App, area: Rect) {
         ));
     }
 
-    let footer = Paragraph::new(Line::from(spans))
-        .style(Style::default().bg(bg_sidebar));
+    let footer = Paragraph::new(Line::from(spans)).style(Style::default().bg(bg_sidebar));
     frame.render_widget(footer, area);
 }
 const PURPLE: Color = Color::Rgb(180, 130, 255);
@@ -2020,7 +2092,10 @@ fn render_main_service_detail(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled(" > ", Style::default().fg(border_dim)),
             Span::styled("Services", Style::default().fg(label)),
             Span::styled(" > ", Style::default().fg(border_dim)),
-            Span::styled(svc.name.as_str(), Style::default().fg(value).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                svc.name.as_str(),
+                Style::default().fg(value).add_modifier(Modifier::BOLD),
+            ),
         ]),
         Line::from(""),
         Line::from(vec![
@@ -2028,30 +2103,39 @@ fn render_main_service_detail(frame: &mut Frame, app: &App, area: Rect) {
                 format!("  {}", svc.name),
                 Style::default().fg(value).add_modifier(Modifier::BOLD),
             ),
-            Span::styled(
-                format!("  #{}", svc.id),
-                Style::default().fg(label),
-            ),
+            Span::styled(format!("  #{}", svc.id), Style::default().fg(label)),
         ]),
     ];
-    frame.render_widget(Paragraph::new(header_lines).style(Style::default().bg(bg)), layout[0]);
+    frame.render_widget(
+        Paragraph::new(header_lines).style(Style::default().bg(bg)),
+        layout[0],
+    );
 
     let tab_line = Line::from(vec![
         Span::styled("  ", Style::default()),
         if app.detail_tab == DetailTab::Details {
-            Span::styled(" Details ", Style::default().fg(accent).add_modifier(Modifier::BOLD))
+            Span::styled(
+                " Details ",
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
+            )
         } else {
             Span::styled(" Details ", Style::default().fg(label))
         },
         Span::styled("  ", Style::default()),
         if app.detail_tab == DetailTab::WhitelistedIps {
-            Span::styled(" Whitelisted IPs ", Style::default().fg(accent).add_modifier(Modifier::BOLD))
+            Span::styled(
+                " Whitelisted IPs ",
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
+            )
         } else {
             Span::styled(" Whitelisted IPs ", Style::default().fg(label))
         },
         Span::styled("  ", Style::default()),
         if app.detail_tab == super::app::DetailTab::Domains {
-            Span::styled(" Domains ", Style::default().fg(accent).add_modifier(Modifier::BOLD))
+            Span::styled(
+                " Domains ",
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
+            )
         } else {
             Span::styled(" Domains ", Style::default().fg(label))
         },
@@ -2059,19 +2143,28 @@ fn render_main_service_detail(frame: &mut Frame, app: &App, area: Rect) {
     let underline = Line::from(vec![
         Span::styled("  ", Style::default()),
         if app.detail_tab == DetailTab::Details {
-            Span::styled("\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}", Style::default().fg(accent))
+            Span::styled(
+                "\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}",
+                Style::default().fg(accent),
+            )
         } else {
             Span::styled("         ", Style::default().fg(border_dim))
         },
         Span::styled("  ", Style::default()),
         if app.detail_tab == DetailTab::WhitelistedIps {
-            Span::styled("\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}", Style::default().fg(accent))
+            Span::styled(
+                "\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}",
+                Style::default().fg(accent),
+            )
         } else {
             Span::styled("                 ", Style::default().fg(border_dim))
         },
         Span::styled("  ", Style::default()),
         if app.detail_tab == super::app::DetailTab::Domains {
-            Span::styled("\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}", Style::default().fg(accent))
+            Span::styled(
+                "\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}",
+                Style::default().fg(accent),
+            )
         } else {
             Span::styled("         ", Style::default().fg(border_dim))
         },
@@ -2094,8 +2187,16 @@ fn render_main_service_detail(frame: &mut Frame, app: &App, area: Rect) {
 
         if let Some(ref msg) = app.status_message {
             let success_color = app.theme.palette().success;
-            let color = if app.status_is_error { Color::Rgb(200, 80, 80) } else { success_color };
-            let icon = if app.status_is_error { "\u{2717} " } else { "\u{2713} " };
+            let color = if app.status_is_error {
+                Color::Rgb(200, 80, 80)
+            } else {
+                success_color
+            };
+            let icon = if app.status_is_error {
+                "\u{2717} "
+            } else {
+                "\u{2713} "
+            };
             overlay_lines.push(Line::from(vec![
                 Span::styled("  ", Style::default()),
                 Span::styled(icon, Style::default().fg(color)),
@@ -2105,7 +2206,9 @@ fn render_main_service_detail(frame: &mut Frame, app: &App, area: Rect) {
 
         if let Some(ref kind) = app.confirm {
             let prompt = match kind {
-                super::app::ConfirmKind::RegenerateLicenseKey => "Regenerate this license key? This cannot be undone.",
+                super::app::ConfirmKind::RegenerateLicenseKey => {
+                    "Regenerate this license key? This cannot be undone."
+                }
                 super::app::ConfirmKind::RemoveLicenseIp => "Remove this IP from the whitelist?",
                 super::app::ConfirmKind::RemoveDomain => "Remove this domain?",
                 _ => "Are you sure?",
@@ -2166,11 +2269,29 @@ fn render_detail_tab(
     lines.push(Line::from(""));
     card_top(&mut lines, cw, border_dim);
 
-    lines.push(card_row_labels("License Key", "Issue Date", half, label, border_dim));
-    lines.push(card_row_values(&svc.license_key, &svc.issue_date, half, value, border_dim));
+    lines.push(card_row_labels(
+        "License Key",
+        "Issue Date",
+        half,
+        label,
+        border_dim,
+    ));
+    lines.push(card_row_values(
+        &svc.license_key,
+        &svc.issue_date,
+        half,
+        value,
+        border_dim,
+    ));
     card_empty(&mut lines, border_dim);
 
-    lines.push(card_row_labels("Next Renewal", "Service Status", half, label, border_dim));
+    lines.push(card_row_labels(
+        "Next Renewal",
+        "Service Status",
+        half,
+        label,
+        border_dim,
+    ));
     lines.push(Line::from(vec![
         Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
         Span::styled(
@@ -2184,16 +2305,31 @@ fn render_detail_tab(
     ]));
     card_empty(&mut lines, border_dim);
 
-    lines.push(card_row_labels("Auto Renew", "Price", half, label, border_dim));
-    let renew_label = if svc.auto_renew { "\u{2713} Enabled" } else { "\u{2717} Disabled" };
+    lines.push(card_row_labels(
+        "Auto Renew",
+        "Price",
+        half,
+        label,
+        border_dim,
+    ));
+    let renew_label = if svc.auto_renew {
+        "\u{2713} Enabled"
+    } else {
+        "\u{2717} Disabled"
+    };
     let renew_color = if svc.auto_renew { success } else { label };
     lines.push(Line::from(vec![
         Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
         Span::styled(
             format!("{:<w$}", renew_label, w = half),
-            Style::default().fg(renew_color).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(renew_color)
+                .add_modifier(Modifier::BOLD),
         ),
-        Span::styled("Free", Style::default().fg(value).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Free",
+            Style::default().fg(value).add_modifier(Modifier::BOLD),
+        ),
     ]));
 
     card_bottom(&mut lines, cw, border_dim);
@@ -2206,12 +2342,10 @@ fn render_detail_tab(
             Style::default().fg(value).add_modifier(Modifier::BOLD),
         ),
     ]));
-    lines.push(Line::from(vec![
-        Span::styled(
-            "  Choose how your product key validates access",
-            Style::default().fg(label),
-        ),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        "  Choose how your product key validates access",
+        Style::default().fg(label),
+    )]));
     lines.push(Line::from(""));
 
     let is_ip_mode = svc.auth_mode == "ip_whitelist";
@@ -2237,22 +2371,41 @@ fn render_detail_tab(
         Span::styled(format!("{} ", ip_icon), Style::default().fg(ip_text_color)),
         Span::styled(
             format!("IP Whitelist{:<w$}", "", w = bw.saturating_sub(15)),
-            Style::default().fg(ip_text_color).add_modifier(if is_ip_mode { Modifier::BOLD } else { Modifier::empty() }),
+            Style::default()
+                .fg(ip_text_color)
+                .add_modifier(if is_ip_mode {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
         ),
         Span::styled("\u{2502}", Style::default().fg(ip_border)),
         Span::styled(" ", Style::default()),
         Span::styled("\u{2502} ", Style::default().fg(api_border)),
-        Span::styled(format!("{} ", api_icon), Style::default().fg(api_text_color)),
+        Span::styled(
+            format!("{} ", api_icon),
+            Style::default().fg(api_text_color),
+        ),
         Span::styled(
             format!("API Key Only{:<w$}", "", w = bw.saturating_sub(15)),
-            Style::default().fg(api_text_color).add_modifier(if !is_ip_mode { Modifier::BOLD } else { Modifier::empty() }),
+            Style::default()
+                .fg(api_text_color)
+                .add_modifier(if !is_ip_mode {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
         ),
         Span::styled("\u{2502}", Style::default().fg(api_border)),
     ]));
     lines.push(Line::from(vec![
         Span::styled("  \u{2502} ", Style::default().fg(ip_border)),
         Span::styled(
-            format!("  Only whitelisted IPs{:<w$}", "", w = bw.saturating_sub(23)),
+            format!(
+                "  Only whitelisted IPs{:<w$}",
+                "",
+                w = bw.saturating_sub(23)
+            ),
             Style::default().fg(label),
         ),
         Span::styled("\u{2502}", Style::default().fg(ip_border)),
@@ -2284,7 +2437,10 @@ fn render_detail_tab(
         lines.push(Line::from(vec![
             Span::styled("  \u{2502} ", Style::default().fg(RED_WARN)),
             Span::styled("\u{26a0} ", Style::default().fg(yellow)),
-            Span::styled("API Key Mode Active", Style::default().fg(yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "API Key Mode Active",
+                Style::default().fg(yellow).add_modifier(Modifier::BOLD),
+            ),
         ]));
         lines.push(Line::from(vec![
             Span::styled("  \u{2502} ", Style::default().fg(RED_WARN)),
@@ -2305,7 +2461,10 @@ fn render_detail_tab(
         card_top(&mut lines, cw, border_dim);
         lines.push(Line::from(vec![
             Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
-            Span::styled("Allowed Domains", Style::default().fg(value).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Allowed Domains",
+                Style::default().fg(value).add_modifier(Modifier::BOLD),
+            ),
         ]));
         card_empty(&mut lines, border_dim);
 
@@ -2345,17 +2504,32 @@ fn render_detail_tab(
     card_top(&mut lines, cw, border_dim);
     lines.push(Line::from(vec![
         Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
-        Span::styled("Service Limits", Style::default().fg(value).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Service Limits",
+            Style::default().fg(value).add_modifier(Modifier::BOLD),
+        ),
     ]));
     card_empty(&mut lines, border_dim);
 
     let third = cw / 3;
     lines.push(Line::from(vec![
         Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
-        Span::styled(format!("{:<tw$}", "RPS Limit", tw = third / 2), Style::default().fg(label)),
-        Span::styled(format!("{:<tw$}", "1000 req/s", tw = third / 2), Style::default().fg(value).add_modifier(Modifier::BOLD)),
-        Span::styled(format!("{:<tw$}", "TPS Limit", tw = third / 2), Style::default().fg(label)),
-        Span::styled(format!("{:<tw$}", "300 tx/s", tw = third / 2), Style::default().fg(value).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{:<tw$}", "RPS Limit", tw = third / 2),
+            Style::default().fg(label),
+        ),
+        Span::styled(
+            format!("{:<tw$}", "1000 req/s", tw = third / 2),
+            Style::default().fg(value).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("{:<tw$}", "TPS Limit", tw = third / 2),
+            Style::default().fg(label),
+        ),
+        Span::styled(
+            format!("{:<tw$}", "300 tx/s", tw = third / 2),
+            Style::default().fg(value).add_modifier(Modifier::BOLD),
+        ),
         Span::styled("gRPC (Geyser)  ", Style::default().fg(label)),
         Span::styled("\u{2713} Enabled", Style::default().fg(success)),
     ]));
@@ -2363,9 +2537,18 @@ fn render_detail_tab(
 
     lines.push(Line::from(vec![
         Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
-        Span::styled(format!("{:<tw$}", "Jetstream", tw = third / 2), Style::default().fg(label)),
-        Span::styled(format!("{:<tw$}", "\u{2713} Enabled", tw = third / 2), Style::default().fg(success)),
-        Span::styled(format!("{:<tw$}", "WebSockets", tw = third / 2), Style::default().fg(label)),
+        Span::styled(
+            format!("{:<tw$}", "Jetstream", tw = third / 2),
+            Style::default().fg(label),
+        ),
+        Span::styled(
+            format!("{:<tw$}", "\u{2713} Enabled", tw = third / 2),
+            Style::default().fg(success),
+        ),
+        Span::styled(
+            format!("{:<tw$}", "WebSockets", tw = third / 2),
+            Style::default().fg(label),
+        ),
         Span::styled("\u{2713} Enabled", Style::default().fg(success)),
     ]));
 
@@ -2376,7 +2559,10 @@ fn render_detail_tab(
         card_top(&mut lines, cw, border_dim);
         lines.push(Line::from(vec![
             Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
-            Span::styled("Quick Connect", Style::default().fg(value).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Quick Connect",
+                Style::default().fg(value).add_modifier(Modifier::BOLD),
+            ),
         ]));
         lines.push(Line::from(vec![
             Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
@@ -2431,13 +2617,19 @@ fn render_detail_tab(
         lines.push(Line::from(vec![
             Span::styled("  \u{2502}  \u{2502} ", Style::default().fg(border)),
             Span::styled(marker, Style::default().fg(accent)),
-            Span::styled(format!("{} ", arrow), Style::default().fg(if is_selected { accent } else { label })),
+            Span::styled(
+                format!("{} ", arrow),
+                Style::default().fg(if is_selected { accent } else { label }),
+            ),
             Span::styled(
                 format!("{:<8}", loc.name),
                 Style::default().fg(name_color).add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                format!("#{} \u{2022} {} slots \u{2022} {} ep", loc.id, loc.slots, ep_count),
+                format!(
+                    "#{} \u{2022} {} slots \u{2022} {} ep",
+                    loc.id, loc.slots, ep_count
+                ),
                 Style::default().fg(label),
             ),
             Span::styled("  ", Style::default()),
@@ -2473,7 +2665,9 @@ fn render_detail_tab(
 
     let scroll = app.detail_scroll;
     frame.render_widget(
-        Paragraph::new(lines).style(Style::default().bg(bg)).scroll((scroll, 0)),
+        Paragraph::new(lines)
+            .style(Style::default().bg(bg))
+            .scroll((scroll, 0)),
         area,
     );
 }
@@ -2491,19 +2685,28 @@ fn render_ips_tab(
 
     use super::app::DomainNetwork;
     let is_mainnet = app.detail_domain_network == DomainNetwork::Mainnet;
-    let filtered_locs: Vec<(usize, &super::models::Location)> = svc.locations.iter()
+    let filtered_locs: Vec<(usize, &super::models::Location)> = svc
+        .locations
+        .iter()
         .enumerate()
         .filter(|(_, l)| {
-            if is_mainnet { !l.name.eq_ignore_ascii_case("devnet") }
-            else { l.name.eq_ignore_ascii_case("devnet") }
+            if is_mainnet {
+                !l.name.eq_ignore_ascii_case("devnet")
+            } else {
+                l.name.eq_ignore_ascii_case("devnet")
+            }
         })
         .collect();
 
-    let mainnet_ips: usize = svc.locations.iter()
+    let mainnet_ips: usize = svc
+        .locations
+        .iter()
         .filter(|l| !l.name.eq_ignore_ascii_case("devnet"))
         .map(|l| l.ips.len())
         .sum();
-    let devnet_ips: usize = svc.locations.iter()
+    let devnet_ips: usize = svc
+        .locations
+        .iter()
         .filter(|l| l.name.eq_ignore_ascii_case("devnet"))
         .map(|l| l.ips.len())
         .sum();
@@ -2511,18 +2714,34 @@ fn render_ips_tab(
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
         Span::styled("  ", Style::default()),
-        Span::styled("\u{25cf} ", Style::default().fg(if is_mainnet { success } else { label })),
+        Span::styled(
+            "\u{25cf} ",
+            Style::default().fg(if is_mainnet { success } else { label }),
+        ),
         Span::styled(
             format!("Mainnet ({} IPs)", mainnet_ips),
-            Style::default().fg(if is_mainnet { success } else { label })
-                .add_modifier(if is_mainnet { Modifier::BOLD } else { Modifier::empty() }),
+            Style::default()
+                .fg(if is_mainnet { success } else { label })
+                .add_modifier(if is_mainnet {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
         ),
         Span::styled("    ", Style::default()),
-        Span::styled("\u{25cf} ", Style::default().fg(if !is_mainnet { PURPLE } else { label })),
+        Span::styled(
+            "\u{25cf} ",
+            Style::default().fg(if !is_mainnet { PURPLE } else { label }),
+        ),
         Span::styled(
             format!("Devnet ({} IPs)", devnet_ips),
-            Style::default().fg(if !is_mainnet { PURPLE } else { label })
-                .add_modifier(if !is_mainnet { Modifier::BOLD } else { Modifier::empty() }),
+            Style::default()
+                .fg(if !is_mainnet { PURPLE } else { label })
+                .add_modifier(if !is_mainnet {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
         ),
     ]));
     lines.push(Line::from(""));
@@ -2534,21 +2753,16 @@ fn render_ips_tab(
             format!("{:<25}", "LOCATION & IP ADDRESS"),
             Style::default().fg(label),
         ),
-        Span::styled(
-            format!("{:<12}", "STATUS"),
-            Style::default().fg(label),
-        ),
-        Span::styled(
-            format!("{:<10}", "TYPE"),
-            Style::default().fg(label),
-        ),
+        Span::styled(format!("{:<12}", "STATUS"), Style::default().fg(label)),
+        Span::styled(format!("{:<10}", "TYPE"), Style::default().fg(label)),
         Span::styled("EXPIRES", Style::default().fg(label)),
     ]));
     card_empty(&mut lines, border_dim);
 
     for (display_idx, (_orig_idx, loc)) in filtered_locs.iter().enumerate() {
         let is_selected = display_idx == app.detail_location_selected;
-        let is_expanded = app.detail_location_expanded == Some(app.detail_location_selected) && is_selected;
+        let is_expanded =
+            app.detail_location_expanded == Some(app.detail_location_selected) && is_selected;
         let arrow = if is_expanded { "\u{25b4}" } else { "\u{25be}" };
         let used = loc.ips.len();
         let available = (loc.slots as usize).saturating_sub(used);
@@ -2558,7 +2772,10 @@ fn render_ips_tab(
         lines.push(Line::from(vec![
             Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
             Span::styled(marker, Style::default().fg(accent)),
-            Span::styled(format!("{} ", arrow), Style::default().fg(if is_selected { accent } else { label })),
+            Span::styled(
+                format!("{} ", arrow),
+                Style::default().fg(if is_selected { accent } else { label }),
+            ),
             Span::styled(
                 format!("{:<8}", loc.name),
                 Style::default().fg(name_color).add_modifier(Modifier::BOLD),
@@ -2583,7 +2800,11 @@ fn render_ips_tab(
                 let ip_color = if ip_selected { accent } else { value };
                 let type_label = if ip.is_rented { "Rented" } else { "Owned" };
                 let type_color = if ip.is_rented { yellow } else { success };
-                let expires = if ip.expires_at.is_empty() { "\u{2014}".to_string() } else { ip.expires_at.clone() };
+                let expires = if ip.expires_at.is_empty() {
+                    "\u{2014}".to_string()
+                } else {
+                    ip.expires_at.clone()
+                };
                 lines.push(Line::from(vec![
                     Span::styled("  \u{2502}     ", Style::default().fg(border_dim)),
                     Span::styled(ip_marker, Style::default().fg(accent)),
@@ -2648,41 +2869,58 @@ fn render_ips_tab(
 
     let scroll = app.detail_scroll;
     frame.render_widget(
-        Paragraph::new(lines).style(Style::default().bg(bg)).scroll((scroll, 0)),
+        Paragraph::new(lines)
+            .style(Style::default().bg(bg))
+            .scroll((scroll, 0)),
         area,
     );
 }
 
-fn render_domains_tab(
-    frame: &mut Frame,
-    app: &App,
-    svc: &super::models::Service,
-    area: Rect,
-) {
+fn render_domains_tab(frame: &mut Frame, app: &App, svc: &super::models::Service, area: Rect) {
     use super::app::DomainNetwork;
     theme!(app => bg, accent, border_dim, label, value, success);
     let cw = (area.width as usize).saturating_sub(6);
     let mut lines: Vec<Line> = Vec::new();
 
     let is_mainnet = app.detail_domain_network == DomainNetwork::Mainnet;
-    let domains = if is_mainnet { &svc.allowed_domains } else { &svc.devnet_allowed_domains };
+    let domains = if is_mainnet {
+        &svc.allowed_domains
+    } else {
+        &svc.devnet_allowed_domains
+    };
     let net_label = if is_mainnet { "Mainnet" } else { "Devnet" };
 
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
         Span::styled("  ", Style::default()),
-        Span::styled("\u{25cf} ", Style::default().fg(if is_mainnet { success } else { label })),
+        Span::styled(
+            "\u{25cf} ",
+            Style::default().fg(if is_mainnet { success } else { label }),
+        ),
         Span::styled(
             format!("Mainnet ({} domains)", svc.allowed_domains.len()),
-            Style::default().fg(if is_mainnet { success } else { label })
-                .add_modifier(if is_mainnet { Modifier::BOLD } else { Modifier::empty() }),
+            Style::default()
+                .fg(if is_mainnet { success } else { label })
+                .add_modifier(if is_mainnet {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
         ),
         Span::styled("    ", Style::default()),
-        Span::styled("\u{25cf} ", Style::default().fg(if !is_mainnet { PURPLE } else { label })),
+        Span::styled(
+            "\u{25cf} ",
+            Style::default().fg(if !is_mainnet { PURPLE } else { label }),
+        ),
         Span::styled(
             format!("Devnet ({} domains)", svc.devnet_allowed_domains.len()),
-            Style::default().fg(if !is_mainnet { PURPLE } else { label })
-                .add_modifier(if !is_mainnet { Modifier::BOLD } else { Modifier::empty() }),
+            Style::default()
+                .fg(if !is_mainnet { PURPLE } else { label })
+                .add_modifier(if !is_mainnet {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
         ),
     ]));
     lines.push(Line::from(""));
@@ -2698,10 +2936,17 @@ fn render_domains_tab(
     lines.push(Line::from(vec![
         Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
         if domains.is_empty() {
-            Span::styled("All domains allowed (no restrictions)", Style::default().fg(label))
+            Span::styled(
+                "All domains allowed (no restrictions)",
+                Style::default().fg(label),
+            )
         } else {
             Span::styled(
-                format!("{} domain{} configured", domains.len(), if domains.len() != 1 { "s" } else { "" }),
+                format!(
+                    "{} domain{} configured",
+                    domains.len(),
+                    if domains.len() != 1 { "s" } else { "" }
+                ),
                 Style::default().fg(label),
             )
         },
@@ -2716,7 +2961,10 @@ fn render_domains_tab(
         ]));
         lines.push(Line::from(vec![
             Span::styled("  \u{2502}     ", Style::default().fg(border_dim)),
-            Span::styled("API can be accessed from any domain.", Style::default().fg(label)),
+            Span::styled(
+                "API can be accessed from any domain.",
+                Style::default().fg(label),
+            ),
         ]));
     } else {
         for (i, domain) in domains.iter().enumerate() {
@@ -2734,7 +2982,10 @@ fn render_domains_tab(
 
     lines.push(Line::from(vec![
         Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
-        Span::styled("Patterns: ", Style::default().fg(label).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Patterns: ",
+            Style::default().fg(label).add_modifier(Modifier::BOLD),
+        ),
         Span::styled("Use ", Style::default().fg(label)),
         Span::styled("*.example.com", Style::default().fg(value)),
         Span::styled(" to match all subdomains", Style::default().fg(label)),
@@ -2742,10 +2993,7 @@ fn render_domains_tab(
 
     card_bottom(&mut lines, cw, border_dim);
 
-    frame.render_widget(
-        Paragraph::new(lines).style(Style::default().bg(bg)),
-        area,
-    );
+    frame.render_widget(Paragraph::new(lines).style(Style::default().bg(bg)), area);
 }
 fn card_top(lines: &mut Vec<Line>, cw: usize, border_dim: Color) {
     lines.push(Line::from(vec![
@@ -2764,12 +3012,19 @@ fn card_bottom(lines: &mut Vec<Line>, cw: usize, border_dim: Color) {
 }
 
 fn card_empty(lines: &mut Vec<Line>, border_dim: Color) {
-    lines.push(Line::from(vec![
-        Span::styled("  \u{2502}", Style::default().fg(border_dim)),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        "  \u{2502}",
+        Style::default().fg(border_dim),
+    )]));
 }
 
-fn card_row_labels(left: &str, right: &str, half: usize, label: Color, border_dim: Color) -> Line<'static> {
+fn card_row_labels(
+    left: &str,
+    right: &str,
+    half: usize,
+    label: Color,
+    border_dim: Color,
+) -> Line<'static> {
     Line::from(vec![
         Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
         Span::styled(
@@ -2780,7 +3035,13 @@ fn card_row_labels(left: &str, right: &str, half: usize, label: Color, border_di
     ])
 }
 
-fn card_row_values(left: &str, right: &str, half: usize, value: Color, border_dim: Color) -> Line<'static> {
+fn card_row_values(
+    left: &str,
+    right: &str,
+    half: usize,
+    value: Color,
+    border_dim: Color,
+) -> Line<'static> {
     Line::from(vec![
         Span::styled("  \u{2502} ", Style::default().fg(border_dim)),
         Span::styled(
@@ -2797,16 +3058,12 @@ fn card_row_values(left: &str, right: &str, half: usize, value: Color, border_di
 fn render_footer_detail(frame: &mut Frame, app: &App, area: Rect) {
     theme!(app => accent, label, bg_sidebar);
     let keys: Vec<(&str, &str)> = if app.input_mode.is_some() {
-        vec![
-            ("[Esc]", "Cancel"),
-            ("[Enter]", "Submit"),
-        ]
+        vec![("[Esc]", "Cancel"), ("[Enter]", "Submit")]
     } else if app.confirm.is_some() {
-        vec![
-            ("[y]", "Confirm"),
-            ("[any]", "Cancel"),
-        ]
-    } else if app.detail_tab == super::app::DetailTab::WhitelistedIps && app.detail_location_expanded.is_some() {
+        vec![("[y]", "Confirm"), ("[any]", "Cancel")]
+    } else if app.detail_tab == super::app::DetailTab::WhitelistedIps
+        && app.detail_location_expanded.is_some()
+    {
         vec![
             ("[q]", "Quit"),
             ("[Esc]", "Back"),
@@ -2879,8 +3136,7 @@ fn render_footer_detail(frame: &mut Frame, app: &App, area: Rect) {
         ));
     }
 
-    let footer = Paragraph::new(Line::from(spans))
-        .style(Style::default().bg(bg_sidebar));
+    let footer = Paragraph::new(Line::from(spans)).style(Style::default().bg(bg_sidebar));
     frame.render_widget(footer, area);
 }
 
@@ -2908,8 +3164,7 @@ fn render_footer_services(frame: &mut Frame, app: &App, area: Rect) {
         ));
     }
 
-    let footer = Paragraph::new(Line::from(spans))
-        .style(Style::default().bg(bg_sidebar));
+    let footer = Paragraph::new(Line::from(spans)).style(Style::default().bg(bg_sidebar));
     frame.render_widget(footer, area);
 }
 fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
@@ -2934,8 +3189,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         ));
     }
 
-    let footer = Paragraph::new(Line::from(spans))
-        .style(Style::default().bg(bg_sidebar));
+    let footer = Paragraph::new(Line::from(spans)).style(Style::default().bg(bg_sidebar));
     frame.render_widget(footer, area);
 }
 fn shrink(area: Rect, top: u16, right: u16, bottom: u16, left: u16) -> Rect {

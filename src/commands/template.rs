@@ -147,11 +147,7 @@ fn list(templates: &[TemplateInfo], filter: Option<&str>) -> CliResult<()> {
     Ok(())
 }
 
-fn view(
-    name: &str,
-    templates: &[TemplateInfo],
-    config: &Config,
-) -> CliResult<()> {
+fn view(name: &str, templates: &[TemplateInfo], config: &Config) -> CliResult<()> {
     let t = templates.iter().find(|t| t.name == name);
     match t {
         Some(t) => {
@@ -248,10 +244,7 @@ async fn install(
     );
     println!();
 
-    let temp_dir = std::env::temp_dir().join(format!(
-        "orbitflare-template-{}",
-        std::process::id()
-    ));
+    let temp_dir = std::env::temp_dir().join(format!("orbitflare-template-{}", std::process::id()));
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 
@@ -336,10 +329,7 @@ async fn install(
 
     Ok(())
 }
-fn copy_dir_recursive(
-    src: &std::path::Path,
-    dst: &std::path::Path,
-) -> CliResult<()> {
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> CliResult<()> {
     std::fs::create_dir_all(dst)?;
 
     for entry in std::fs::read_dir(src)? {

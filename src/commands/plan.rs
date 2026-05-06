@@ -6,8 +6,8 @@ use crate::keyring_store;
 use crate::output;
 use colored::Colorize;
 use comfy_table::{
-    modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Cell, Color as TColor,
-    ContentArrangement, Table,
+    Cell, Color as TColor, ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS,
+    presets::UTF8_FULL,
 };
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
@@ -102,7 +102,11 @@ fn read_cache() -> Option<Vec<RpcPlan>> {
     let path = cache_path();
     let metadata = std::fs::metadata(&path).ok()?;
     let modified = metadata.modified().ok()?;
-    if SystemTime::now().duration_since(modified).unwrap_or(CACHE_TTL) >= CACHE_TTL {
+    if SystemTime::now()
+        .duration_since(modified)
+        .unwrap_or(CACHE_TTL)
+        >= CACHE_TTL
+    {
         return None;
     }
     let contents = std::fs::read_to_string(&path).ok()?;
@@ -137,7 +141,6 @@ fn sort_plans(plans: &mut [RpcPlan]) {
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 }
-
 
 async fn list(profile: Option<&str>) -> CliResult<()> {
     let mut plans = fetch_plans(profile).await?;
@@ -182,7 +185,6 @@ async fn list(profile: Option<&str>) -> CliResult<()> {
     Ok(())
 }
 
-
 async fn view(slug: &str, profile: Option<&str>) -> CliResult<()> {
     let plans = fetch_plans(profile).await?;
     let p = plans
@@ -203,10 +205,7 @@ async fn view(slug: &str, profile: Option<&str>) -> CliResult<()> {
     }
     println!();
     println!("  Slug:       {}", p.slug.as_deref().unwrap_or("—").cyan());
-    println!(
-        "  Base Price: {}",
-        format_price(&p.base_price).green()
-    );
+    println!("  Base Price: {}", format_price(&p.base_price).green());
     println!("  Type:       {}", p.price_type.as_deref().unwrap_or("—"));
 
     if !p.features.is_empty() {
@@ -250,12 +249,7 @@ async fn view(slug: &str, profile: Option<&str>) -> CliResult<()> {
     Ok(())
 }
 
-
-async fn compare(
-    plan_slugs: Vec<String>,
-    all: bool,
-    profile: Option<&str>,
-) -> CliResult<()> {
+async fn compare(plan_slugs: Vec<String>, all: bool, profile: Option<&str>) -> CliResult<()> {
     let mut all_plans = fetch_plans(profile).await?;
     sort_plans(&mut all_plans);
 
@@ -264,7 +258,10 @@ async fn compare(
     } else {
         let mut selected = Vec::new();
         for slug in &plan_slugs {
-            match all_plans.iter().find(|p| p.slug.as_deref() == Some(slug.as_str())) {
+            match all_plans
+                .iter()
+                .find(|p| p.slug.as_deref() == Some(slug.as_str()))
+            {
                 Some(p) => selected.push(p),
                 None => return Err(format!("Plan '{}' not found", slug).into()),
             }

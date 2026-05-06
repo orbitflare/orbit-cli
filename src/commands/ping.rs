@@ -1,12 +1,12 @@
 use crate::error::{CliError, CliResult};
 use crate::output;
-use orbitflare_sdk::proto::geyser::geyser_client::GeyserClient;
-use orbitflare_sdk::proto::jetstream::jetstream_client::JetstreamClient;
 use colored::Colorize;
 use comfy_table::{
-    modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Cell, Color as TColor, ContentArrangement,
-    Table,
+    Cell, Color as TColor, ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS,
+    presets::UTF8_FULL,
 };
+use orbitflare_sdk::proto::geyser::geyser_client::GeyserClient;
+use orbitflare_sdk::proto::jetstream::jetstream_client::JetstreamClient;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tonic::transport::Channel;
@@ -30,20 +30,25 @@ pub async fn run(
 
     let do_rpc = matches!(filter, None | Some("rpc"));
     let do_jetstream = matches!(filter, None | Some("jetstream") | Some("grpc"));
-    let do_grpc = matches!(filter, None | Some("grpc") | Some("yellowstone") | Some("geyser"));
+    let do_grpc = matches!(
+        filter,
+        None | Some("grpc") | Some("yellowstone") | Some("geyser")
+    );
 
     if let Some(s) = filter {
         if !matches!(s, "rpc" | "jetstream" | "grpc" | "yellowstone" | "geyser") {
-            return Err(format!(
-                "Unknown service: '{}'. Available: rpc, jetstream, grpc",
-                s
-            )
-            .into());
+            return Err(
+                format!("Unknown service: '{}'. Available: rpc, jetstream, grpc", s).into(),
+            );
         }
     }
 
     let rpc_count = if do_rpc { rpc_urls.len() } else { 0 };
-    let js_count = if do_jetstream { jetstream_urls.len() } else { 0 };
+    let js_count = if do_jetstream {
+        jetstream_urls.len()
+    } else {
+        0
+    };
     let grpc_count = if do_grpc { grpc_urls.len() } else { 0 };
     let total = rpc_count + js_count + grpc_count;
 
@@ -56,13 +61,22 @@ pub async fn run(
         );
         println!();
         if do_rpc {
-            println!("    {} orbitflare config set rpc.url http://your-rpc-endpoint", "→".dimmed());
+            println!(
+                "    {} orbitflare config set rpc.url http://your-rpc-endpoint",
+                "→".dimmed()
+            );
         }
         if do_jetstream {
-            println!("    {} orbitflare config set jetstream.url http://your-jetstream-endpoint", "→".dimmed());
+            println!(
+                "    {} orbitflare config set jetstream.url http://your-jetstream-endpoint",
+                "→".dimmed()
+            );
         }
         if do_grpc {
-            println!("    {} orbitflare config set grpc.url http://your-grpc-endpoint:10000", "→".dimmed());
+            println!(
+                "    {} orbitflare config set grpc.url http://your-grpc-endpoint:10000",
+                "→".dimmed()
+            );
         }
         println!();
         return Ok(());
@@ -78,7 +92,11 @@ pub async fn run(
             println!("  {} RPC: not configured", "–".dimmed());
         }
         if js_count > 0 {
-            println!("  {} Found {} Jetstream endpoint(s)", "→".dimmed(), js_count);
+            println!(
+                "  {} Found {} Jetstream endpoint(s)",
+                "→".dimmed(),
+                js_count
+            );
         } else if do_jetstream && filter.is_none() {
             println!("  {} Jetstream: not configured", "–".dimmed());
         }
@@ -87,7 +105,11 @@ pub async fn run(
         } else if do_grpc && filter.is_none() {
             println!("  {} gRPC: not configured", "–".dimmed());
         }
-        println!("  {} Pinging {} endpoint(s) concurrently...", "→".dimmed(), total);
+        println!(
+            "  {} Pinging {} endpoint(s) concurrently...",
+            "→".dimmed(),
+            total
+        );
         println!();
     }
 
@@ -275,10 +297,7 @@ pub async fn run(
     Ok(())
 }
 
-async fn check_rpc(
-    client: &reqwest::Client,
-    url: &str,
-) -> Result<(), CliError> {
+async fn check_rpc(client: &reqwest::Client, url: &str) -> Result<(), CliError> {
     let body = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -367,11 +386,7 @@ fn print_progress(done: usize, total: usize) {
     let width = 30;
     let filled = if total > 0 { (done * width) / total } else { 0 };
     let empty = width - filled;
-    let bar = format!(
-        "{}{}",
-        "█".repeat(filled),
-        "░".repeat(empty),
-    );
+    let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty),);
     eprint!(
         "\r  Pinging {} endpoints  {} {}/{}",
         total, bar, done, total,

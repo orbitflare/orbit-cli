@@ -1,29 +1,77 @@
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::models::{self, ApiKeyItem, CoinPrice, ConnectedAccountItem, Invoice, Service, ServiceInfo};
+use super::models::{
+    self, ApiKeyItem, CoinPrice, ConnectedAccountItem, Invoice, Service, ServiceInfo,
+};
 use super::theme::ThemeName;
 #[derive(Clone, Debug)]
 pub enum Action {
     RefreshApiKeys,
-    CreateApiKey { name: String },
-    ToggleApiKeyEnabled { id: u64, currently_enabled: bool },
-    RegenerateApiKey { id: u64 },
-    DeleteApiKey { id: u64 },
-    AddApiKeyIp { id: u64, ip: String },
-    RemoveApiKeyIp { id: u64, ip: String },
+    CreateApiKey {
+        name: String,
+    },
+    ToggleApiKeyEnabled {
+        id: u64,
+        currently_enabled: bool,
+    },
+    RegenerateApiKey {
+        id: u64,
+    },
+    DeleteApiKey {
+        id: u64,
+    },
+    AddApiKeyIp {
+        id: u64,
+        ip: String,
+    },
+    RemoveApiKeyIp {
+        id: u64,
+        ip: String,
+    },
     RefreshService,
-    ToggleLicenseAuthMode { license_key: String },
-    ToggleAutoRenewal { license_key: String },
-    RegenerateLicenseKey { license_key: String },
-    AddLicenseIp { license_key: String, ip: String, location_id: u64 },
-    RemoveLicenseIp { license_key: String, ip: String, location_id: u64 },
-    AddDomain { license_key: String, domain: String },
-    RemoveDomain { license_key: String, domain: String },
-    AddDevnetDomain { license_key: String, domain: String },
-    RemoveDevnetDomain { license_key: String, domain: String },
+    ToggleLicenseAuthMode {
+        license_key: String,
+    },
+    ToggleAutoRenewal {
+        license_key: String,
+    },
+    RegenerateLicenseKey {
+        license_key: String,
+    },
+    AddLicenseIp {
+        license_key: String,
+        ip: String,
+        location_id: u64,
+    },
+    RemoveLicenseIp {
+        license_key: String,
+        ip: String,
+        location_id: u64,
+    },
+    AddDomain {
+        license_key: String,
+        domain: String,
+    },
+    RemoveDomain {
+        license_key: String,
+        domain: String,
+    },
+    AddDevnetDomain {
+        license_key: String,
+        domain: String,
+    },
+    RemoveDevnetDomain {
+        license_key: String,
+        domain: String,
+    },
     RefreshInvoices,
-    PayInvoice { reference: String },
-    UpdateProfile { name: Option<String>, wallet: Option<String> },
+    PayInvoice {
+        reference: String,
+    },
+    UpdateProfile {
+        name: Option<String>,
+        wallet: Option<String>,
+    },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -208,11 +256,26 @@ impl App {
         let user_display = name.to_string();
 
         let sidebar_items = vec![
-            SidebarItem { label: "Dashboard", icon: "\u{f0e4}" },
-            SidebarItem { label: "Services", icon: "\u{f013}" },
-            SidebarItem { label: "Invoices", icon: "\u{f0f6}" },
-            SidebarItem { label: "API Keys", icon: "\u{f084}" },
-            SidebarItem { label: "Profile", icon: "\u{f2bb}" },
+            SidebarItem {
+                label: "Dashboard",
+                icon: "\u{f0e4}",
+            },
+            SidebarItem {
+                label: "Services",
+                icon: "\u{f013}",
+            },
+            SidebarItem {
+                label: "Invoices",
+                icon: "\u{f0f6}",
+            },
+            SidebarItem {
+                label: "API Keys",
+                icon: "\u{f084}",
+            },
+            SidebarItem {
+                label: "Profile",
+                icon: "\u{f2bb}",
+            },
         ];
 
         Self {
@@ -270,7 +333,11 @@ impl App {
             profile_editing: false,
             profile_field: ProfileField::Name,
             profile_name_buf: name.to_string(),
-            profile_wallet_buf: data.payment_wallet_address.as_deref().unwrap_or("").to_string(),
+            profile_wallet_buf: data
+                .payment_wallet_address
+                .as_deref()
+                .unwrap_or("")
+                .to_string(),
             profile_cursor: 0,
 
             pending_action: None,
@@ -352,34 +419,30 @@ impl App {
             KeyCode::Char('T') => {
                 self.theme = self.theme.prev();
             }
-            KeyCode::Esc => {
-                match self.section {
-                    Section::ServiceDetail => self.section = Section::Services,
-                    Section::Home => {}
-                    _ => {
-                        self.section = Section::Home;
-                        self.selected_sidebar = 0;
+            KeyCode::Esc => match self.section {
+                Section::ServiceDetail => self.section = Section::Services,
+                Section::Home => {}
+                _ => {
+                    self.section = Section::Home;
+                    self.selected_sidebar = 0;
+                }
+            },
+            _ => match self.section {
+                Section::Home => self.handle_home_key(key),
+                Section::Services => self.handle_services_key(key),
+                Section::ServiceDetail => self.handle_detail_key(key),
+                Section::Invoices => self.handle_invoices_key(key),
+                Section::ApiKeys => self.handle_api_keys_key(key),
+                Section::Profile => {
+                    if key.code == KeyCode::Char('e') {
+                        self.profile_name_buf = self.user_display.clone();
+                        self.profile_wallet_buf = self.payment_wallet_address.clone();
+                        self.profile_field = ProfileField::Name;
+                        self.profile_cursor = self.user_display.len();
+                        self.profile_editing = true;
                     }
                 }
-            }
-            _ => {
-                match self.section {
-                    Section::Home => self.handle_home_key(key),
-                    Section::Services => self.handle_services_key(key),
-                    Section::ServiceDetail => self.handle_detail_key(key),
-                    Section::Invoices => self.handle_invoices_key(key),
-                    Section::ApiKeys => self.handle_api_keys_key(key),
-                    Section::Profile => {
-                        if key.code == KeyCode::Char('e') {
-                            self.profile_name_buf = self.user_display.clone();
-                            self.profile_wallet_buf = self.payment_wallet_address.clone();
-                            self.profile_field = ProfileField::Name;
-                            self.profile_cursor = self.user_display.len();
-                            self.profile_editing = true;
-                        }
-                    }
-                }
-            }
+            },
         }
     }
 
@@ -427,7 +490,9 @@ impl App {
     }
 
     fn handle_profile_key(&mut self, key: KeyEvent) {
-        if self.loading { return; }
+        if self.loading {
+            return;
+        }
         match key.code {
             KeyCode::Tab => {
                 self.profile_field = match self.profile_field {
@@ -455,8 +520,12 @@ impl App {
                 if self.profile_cursor > 0 {
                     let pos = self.profile_cursor - 1;
                     match self.profile_field {
-                        ProfileField::Name => { self.profile_name_buf.remove(pos); }
-                        ProfileField::Wallet => { self.profile_wallet_buf.remove(pos); }
+                        ProfileField::Name => {
+                            self.profile_name_buf.remove(pos);
+                        }
+                        ProfileField::Wallet => {
+                            self.profile_wallet_buf.remove(pos);
+                        }
                     }
                     self.profile_cursor -= 1;
                 }
@@ -466,8 +535,12 @@ impl App {
                 if self.profile_cursor < len {
                     let pos = self.profile_cursor;
                     match self.profile_field {
-                        ProfileField::Name => { self.profile_name_buf.remove(pos); }
-                        ProfileField::Wallet => { self.profile_wallet_buf.remove(pos); }
+                        ProfileField::Name => {
+                            self.profile_name_buf.remove(pos);
+                        }
+                        ProfileField::Wallet => {
+                            self.profile_wallet_buf.remove(pos);
+                        }
                     }
                 }
             }
@@ -484,7 +557,11 @@ impl App {
                 let wallet = self.profile_wallet_buf.trim().to_string();
                 self.pending_action = Some(Action::UpdateProfile {
                     name: if name.is_empty() { None } else { Some(name) },
-                    wallet: if wallet.is_empty() { None } else { Some(wallet) },
+                    wallet: if wallet.is_empty() {
+                        None
+                    } else {
+                        Some(wallet)
+                    },
                 });
             }
             _ => {}
@@ -492,7 +569,9 @@ impl App {
     }
 
     fn handle_invoices_key(&mut self, key: KeyEvent) {
-        if self.loading { return; }
+        if self.loading {
+            return;
+        }
         match key.code {
             KeyCode::Tab => {
                 self.invoices_view = match self.invoices_view {
@@ -665,9 +744,18 @@ impl App {
                             if let Some(svc) = self.services.get(self.services_selected)
                                 && self.detail_location_expanded.is_some()
                             {
-                                let is_mainnet = self.detail_domain_network == DomainNetwork::Mainnet;
-                                if let Some(loc) = svc.locations.iter()
-                                    .filter(|l| if is_mainnet { !l.name.eq_ignore_ascii_case("devnet") } else { l.name.eq_ignore_ascii_case("devnet") })
+                                let is_mainnet =
+                                    self.detail_domain_network == DomainNetwork::Mainnet;
+                                if let Some(loc) = svc
+                                    .locations
+                                    .iter()
+                                    .filter(|l| {
+                                        if is_mainnet {
+                                            !l.name.eq_ignore_ascii_case("devnet")
+                                        } else {
+                                            l.name.eq_ignore_ascii_case("devnet")
+                                        }
+                                    })
                                     .nth(self.detail_location_selected)
                                 {
                                     self.pending_action = Some(Action::AddLicenseIp {
@@ -682,8 +770,14 @@ impl App {
                             if let Some(svc) = self.services.get(self.services_selected) {
                                 let lk = svc.license_key.clone();
                                 self.pending_action = Some(match self.detail_domain_network {
-                                    DomainNetwork::Mainnet => Action::AddDomain { license_key: lk, domain: value },
-                                    DomainNetwork::Devnet => Action::AddDevnetDomain { license_key: lk, domain: value },
+                                    DomainNetwork::Mainnet => Action::AddDomain {
+                                        license_key: lk,
+                                        domain: value,
+                                    },
+                                    DomainNetwork::Devnet => Action::AddDevnetDomain {
+                                        license_key: lk,
+                                        domain: value,
+                                    },
                                 });
                             }
                         }
@@ -710,7 +804,8 @@ impl App {
                 match kind {
                     Some(ConfirmKind::Regenerate) => {
                         if let Some(key_item) = self.api_keys.get(self.api_keys_selected) {
-                            self.pending_action = Some(Action::RegenerateApiKey { id: key_item.id });
+                            self.pending_action =
+                                Some(Action::RegenerateApiKey { id: key_item.id });
                         }
                     }
                     Some(ConfirmKind::Delete) => {
@@ -742,8 +837,16 @@ impl App {
                             && self.detail_location_expanded.is_some()
                         {
                             let is_mainnet = self.detail_domain_network == DomainNetwork::Mainnet;
-                            if let Some(loc) = svc.locations.iter()
-                                .filter(|l| if is_mainnet { !l.name.eq_ignore_ascii_case("devnet") } else { l.name.eq_ignore_ascii_case("devnet") })
+                            if let Some(loc) = svc
+                                .locations
+                                .iter()
+                                .filter(|l| {
+                                    if is_mainnet {
+                                        !l.name.eq_ignore_ascii_case("devnet")
+                                    } else {
+                                        l.name.eq_ignore_ascii_case("devnet")
+                                    }
+                                })
                                 .nth(self.detail_location_selected)
                             {
                                 self.pending_action = Some(Action::RemoveLicenseIp {
@@ -760,8 +863,14 @@ impl App {
                         {
                             let lk = svc.license_key.clone();
                             self.pending_action = Some(match self.detail_domain_network {
-                                DomainNetwork::Mainnet => Action::RemoveDomain { license_key: lk, domain },
-                                DomainNetwork::Devnet => Action::RemoveDevnetDomain { license_key: lk, domain },
+                                DomainNetwork::Mainnet => Action::RemoveDomain {
+                                    license_key: lk,
+                                    domain,
+                                },
+                                DomainNetwork::Devnet => Action::RemoveDevnetDomain {
+                                    license_key: lk,
+                                    domain,
+                                },
                             });
                         }
                     }
@@ -806,7 +915,8 @@ impl App {
                     if self.detail_location_expanded.is_some() {
                         self.detail_ip_selected = self.detail_ip_selected.saturating_sub(1);
                     } else {
-                        self.detail_location_selected = self.detail_location_selected.saturating_sub(1);
+                        self.detail_location_selected =
+                            self.detail_location_selected.saturating_sub(1);
                     }
                 } else if self.detail_tab == DetailTab::Domains {
                     self.detail_domain_selected = self.detail_domain_selected.saturating_sub(1);
@@ -817,12 +927,28 @@ impl App {
             KeyCode::Down | KeyCode::Char('j') => {
                 if self.detail_tab == DetailTab::WhitelistedIps {
                     let is_mainnet = self.detail_domain_network == DomainNetwork::Mainnet;
-                    let filtered_count = svc.locations.iter()
-                        .filter(|l| if is_mainnet { !l.name.eq_ignore_ascii_case("devnet") } else { l.name.eq_ignore_ascii_case("devnet") })
+                    let filtered_count = svc
+                        .locations
+                        .iter()
+                        .filter(|l| {
+                            if is_mainnet {
+                                !l.name.eq_ignore_ascii_case("devnet")
+                            } else {
+                                l.name.eq_ignore_ascii_case("devnet")
+                            }
+                        })
                         .count();
                     if self.detail_location_expanded.is_some() {
-                        let filtered_loc = svc.locations.iter()
-                            .filter(|l| if is_mainnet { !l.name.eq_ignore_ascii_case("devnet") } else { l.name.eq_ignore_ascii_case("devnet") })
+                        let filtered_loc = svc
+                            .locations
+                            .iter()
+                            .filter(|l| {
+                                if is_mainnet {
+                                    !l.name.eq_ignore_ascii_case("devnet")
+                                } else {
+                                    l.name.eq_ignore_ascii_case("devnet")
+                                }
+                            })
                             .nth(self.detail_location_selected);
                         if let Some(loc) = filtered_loc {
                             let max = loc.ips.len().saturating_sub(1);
@@ -897,7 +1023,9 @@ impl App {
                 }
             }
             KeyCode::Char('n') => {
-                if self.detail_tab == DetailTab::WhitelistedIps || self.detail_tab == DetailTab::Domains {
+                if self.detail_tab == DetailTab::WhitelistedIps
+                    || self.detail_tab == DetailTab::Domains
+                {
                     self.detail_domain_network = match self.detail_domain_network {
                         DomainNetwork::Mainnet => DomainNetwork::Devnet,
                         DomainNetwork::Devnet => DomainNetwork::Mainnet,
@@ -909,10 +1037,20 @@ impl App {
                 }
             }
             KeyCode::Char('a') => {
-                if self.detail_tab == DetailTab::WhitelistedIps && self.detail_location_expanded.is_some() {
+                if self.detail_tab == DetailTab::WhitelistedIps
+                    && self.detail_location_expanded.is_some()
+                {
                     let is_mainnet = self.detail_domain_network == DomainNetwork::Mainnet;
-                    let has_loc = svc.locations.iter()
-                        .filter(|l| if is_mainnet { !l.name.eq_ignore_ascii_case("devnet") } else { l.name.eq_ignore_ascii_case("devnet") })
+                    let has_loc = svc
+                        .locations
+                        .iter()
+                        .filter(|l| {
+                            if is_mainnet {
+                                !l.name.eq_ignore_ascii_case("devnet")
+                            } else {
+                                l.name.eq_ignore_ascii_case("devnet")
+                            }
+                        })
                         .nth(self.detail_location_selected)
                         .is_some();
                     if has_loc {
@@ -925,10 +1063,20 @@ impl App {
                 }
             }
             KeyCode::Char('d') => {
-                if self.detail_tab == DetailTab::WhitelistedIps && self.detail_location_expanded.is_some() {
+                if self.detail_tab == DetailTab::WhitelistedIps
+                    && self.detail_location_expanded.is_some()
+                {
                     let is_mainnet = self.detail_domain_network == DomainNetwork::Mainnet;
-                    let filtered_loc = svc.locations.iter()
-                        .filter(|l| if is_mainnet { !l.name.eq_ignore_ascii_case("devnet") } else { l.name.eq_ignore_ascii_case("devnet") })
+                    let filtered_loc = svc
+                        .locations
+                        .iter()
+                        .filter(|l| {
+                            if is_mainnet {
+                                !l.name.eq_ignore_ascii_case("devnet")
+                            } else {
+                                l.name.eq_ignore_ascii_case("devnet")
+                            }
+                        })
                         .nth(self.detail_location_selected);
                     if let Some(loc) = filtered_loc
                         && let Some(ip_entry) = loc.ips.get(self.detail_ip_selected)
