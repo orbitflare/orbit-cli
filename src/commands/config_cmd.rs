@@ -165,8 +165,10 @@ fn remove(key: String, value: String) -> CliResult<()> {
 
 fn reset() -> CliResult<()> {
     let existing = Config::load()?;
-    let mut config = Config::default();
-    config.auth = existing.auth;
+    let config = Config {
+        auth: existing.auth,
+        ..Config::default()
+    };
     config.save()?;
     println!("{} Configuration reset to defaults", "✓".green().bold());
     Ok(())

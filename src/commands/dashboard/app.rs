@@ -292,11 +292,11 @@ impl App {
     pub fn tick(&mut self) {
         self.tick_count += 1;
 
-        if self.tick_count.is_multiple_of(2) {
+        if self.tick_count % 2 == 0 {
             self.ticker_offset += 1;
         }
 
-        if self.tick_count.is_multiple_of(4) {
+        if self.tick_count % 4 == 0 {
             self.prices = models::ticker_prices();
         }
 

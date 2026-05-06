@@ -489,7 +489,7 @@ fn print_transaction(
 
         let fee = info.meta.as_ref().map(|m| m.fee).unwrap_or(0);
 
-        if let Some(ref tx_msg) = info.transaction.as_ref().and_then(|t| t.message.as_ref()) {
+        if let Some(tx_msg) = info.transaction.as_ref().and_then(|t| t.message.as_ref()) {
             let num_accounts = tx_msg.account_keys.len();
             let num_instructions = tx_msg.instructions.len();
             let has_alt = !tx_msg.address_table_lookups.is_empty();

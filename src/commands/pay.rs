@@ -460,8 +460,7 @@ async fn order(
         println!();
         println!("{table}");
         println!();
-    } else {
-        let reference = reference.unwrap();
+    } else if let Some(reference) = reference {
         eprintln!("  {} Fetching order '{}'...", "→".dimmed(), reference);
         let o = api.order_detail(reference).await?;
 
@@ -585,8 +584,7 @@ async fn invoice(
         println!();
         println!("{table}");
         println!();
-    } else {
-        let reference = reference.unwrap();
+    } else if let Some(reference) = reference {
         eprintln!("  {} Fetching invoice '{}'...", "→".dimmed(), reference);
         let invoices = api.invoices().await?;
         let inv = invoices

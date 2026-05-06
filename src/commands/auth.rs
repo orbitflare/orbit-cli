@@ -226,7 +226,7 @@ async fn login_wallet(
             print_login_success(&user, profile_name);
             Ok(())
         }
-        Err(e) if matches!(e, CliError::WalletNotLinked) => {
+        Err(CliError::WalletNotLinked) => {
             eprintln!(
                 "  {} Wallet not linked to any account. Let's register.",
                 "!".yellow()
