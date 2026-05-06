@@ -3,11 +3,8 @@ mod cli;
 mod commands;
 mod config;
 pub mod error;
-mod jetstream_proto;
 pub mod keyring_store;
 pub mod output;
-mod rpc_client;
-mod yellowstone_proto;
 
 use clap::Parser;
 use cli::{Cli, Commands};
@@ -34,12 +31,27 @@ async fn main() {
 
 fn apply_api_key(url: &str, api_key: Option<&str>) -> String {
     match api_key {
-        Some(key) if !key.is_empty() && !url.contains("api_key=") && url.contains("orbitflare.com") => {
-            let sep = if url.contains('?') { "&" } else { "?" };
-            format!("{}{}api_key={}", url, sep, key)
+        Some(key)
+            if !key.is_empty()
+                && !url.contains("api_key=")
+                && url.contains("orbitflare.com") =>
+        {
+            let (base, sep) = if url.contains('?') {
+                (url.to_string(), "&")
+            } else if url_has_path(url) {
+                (url.to_string(), "?")
+            } else {
+                (format!("{}/", url), "?")
+            };
+            format!("{}{}api_key={}", base, sep, key)
         }
         _ => url.to_string(),
     }
+}
+
+fn url_has_path(url: &str) -> bool {
+    let after_scheme = url.split_once("://").map(|(_, rest)| rest).unwrap_or(url);
+    after_scheme.contains('/')
 }
 
 pub fn strip_api_key(s: &str) -> String {
@@ -66,6 +78,20 @@ struct RpcContext {
     rpc_url: String,
     rpc_fallbacks: Vec<String>,
     commitment: String,
+    api_key: Option<String>,
+}
+
+impl RpcContext {
+    fn rpc_url_with_key(&self) -> String {
+        apply_api_key(&self.rpc_url, self.api_key.as_deref())
+    }
+
+    fn fallback_urls_with_key(&self) -> Vec<String> {
+        self.rpc_fallbacks
+            .iter()
+            .map(|u| apply_api_key(u, self.api_key.as_deref()))
+            .collect()
+    }
 }
 
 fn resolve_profile<'a>(profile_override: Option<&'a str>, config: &'a config::Config) -> Option<&'a str> {
@@ -93,33 +119,36 @@ fn resolve_rpc_context(
     } else {
         &config.endpoints.rpc.url
     };
-    let rpc_url = apply_api_key(base_rpc_url, license_key.as_deref());
+    let rpc_url = base_rpc_url.to_string();
     let commitment = commitment_flag
         .unwrap_or(&config.preferences.commitment)
         .to_string();
 
     let rpc_fallbacks: Vec<String> = if !fallback_urls.is_empty() {
-        fallback_urls.iter().map(|u| apply_api_key(u, license_key.as_deref())).collect()
+        fallback_urls.to_vec()
     } else if network == "devnet" {
-        config.endpoints.rpc.devnet_fallback_url.iter().map(|u| apply_api_key(u, license_key.as_deref())).collect()
+        config.endpoints.rpc.devnet_fallback_url.clone()
     } else {
-        config.endpoints.rpc.fallback_url.iter().map(|u| apply_api_key(u, license_key.as_deref())).collect()
+        config.endpoints.rpc.fallback_url.clone()
     };
 
-    RpcContext { rpc_url, rpc_fallbacks, commitment }
+    let api_key = license_key.filter(|_| rpc_url.contains("orbitflare.com"));
+
+    RpcContext { rpc_url, rpc_fallbacks, commitment, api_key }
 }
 
 async fn dispatch(cli: Cli) -> CliResult<()> {
     let config = config::Config::load()?;
 
     let grpc_url = cli.grpc_url;
+    let ws_url = cli.ws_url;
     let fallback_url = cli.fallback_url;
     let network = cli.network;
     let profile_override = cli.profile;
 
     let needs_rpc = matches!(
         cli.command,
-        Commands::Ping { .. } | Commands::Rpc { .. }
+        Commands::Ping { .. } | Commands::Rpc { .. } | Commands::Ws { .. }
     );
     let profile = resolve_profile(profile_override.as_deref(), &config);
 
@@ -141,8 +170,8 @@ async fn dispatch(cli: Cli) -> CliResult<()> {
         Commands::Config { command } => commands::config_cmd::run(command),
         Commands::Ping { service } => {
             let ctx = rpc_ctx.unwrap();
-            let mut ping_rpc_urls: Vec<String> = vec![ctx.rpc_url];
-            ping_rpc_urls.extend(ctx.rpc_fallbacks);
+            let mut ping_rpc_urls: Vec<String> = vec![ctx.rpc_url_with_key()];
+            ping_rpc_urls.extend(ctx.fallback_urls_with_key());
             let ping_rpc_urls: Vec<String> = ping_rpc_urls.into_iter().filter(|u| !u.is_empty()).collect();
 
             let mut ping_js_urls = vec![
@@ -188,7 +217,15 @@ async fn dispatch(cli: Cli) -> CliResult<()> {
         }
         Commands::Rpc { command } => {
             let ctx = rpc_ctx.unwrap();
-            let rpc = rpc_client::RpcClient::new(ctx.rpc_url, ctx.rpc_fallbacks, ctx.commitment);
+            let fallback_refs: Vec<&str> = ctx.rpc_fallbacks.iter().map(|s| s.as_str()).collect();
+            let mut builder = orbitflare_sdk::RpcClientBuilder::new()
+                .url(&ctx.rpc_url)
+                .fallback_urls(&fallback_refs)
+                .commitment(&ctx.commitment);
+            if let Some(ref key) = ctx.api_key {
+                builder = builder.api_key(key);
+            }
+            let rpc = builder.build()?;
             commands::rpc::run(command, &rpc).await
         }
         Commands::Template(args) => {
@@ -203,5 +240,20 @@ async fn dispatch(cli: Cli) -> CliResult<()> {
         Commands::Dashboard => {
             commands::dashboard::run().await
         }
+        Commands::Ws { command } => {
+            let ctx = rpc_ctx.unwrap();
+            let ws = ws_url.unwrap_or_else(|| derive_ws_url(&ctx.rpc_url));
+            commands::ws::run(command, &ws, &ctx.commitment, ctx.api_key.as_deref()).await
+        }
+    }
+}
+
+fn derive_ws_url(rpc_url: &str) -> String {
+    if let Some(rest) = rpc_url.strip_prefix("https://") {
+        format!("wss://{}", rest)
+    } else if let Some(rest) = rpc_url.strip_prefix("http://") {
+        format!("ws://{}", rest)
+    } else {
+        rpc_url.to_string()
     }
 }

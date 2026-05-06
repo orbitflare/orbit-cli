@@ -1,18 +1,16 @@
 use crate::cli::JetArgs;
 use crate::config::Config;
 use crate::error::CliResult;
-use crate::jetstream_proto::jetstream::{
-    jetstream_client::JetstreamClient, subscribe_update::UpdateOneof, SubscribeRequest,
-    SubscribeRequestFilterAccounts, SubscribeRequestFilterTransactions, SubscribeRequestPing,
-};
 use colored::Colorize;
+use orbitflare_sdk::proto::jetstream::{
+    SubscribeRequest, SubscribeRequestFilterAccounts, SubscribeRequestFilterTransactions,
+    SubscribeRequestPing, subscribe_update::UpdateOneof,
+};
+use orbitflare_sdk::{JetstreamClientBuilder, RetryPolicy};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use tokio::signal;
-use tokio::sync::watch;
-use tokio_stream::StreamExt;
-use tonic::transport::Channel;
 
 #[derive(Deserialize)]
 struct StreamConfig {
@@ -96,8 +94,6 @@ struct StreamStats {
     started_at: Instant,
     tx_count: u64,
     acct_count: u64,
-    ping_count: u64,
-    reconnect_count: u64,
     latest_slot: u64,
     highest_slot: u64,
 }
@@ -108,8 +104,6 @@ impl StreamStats {
             started_at: Instant::now(),
             tx_count: 0,
             acct_count: 0,
-            ping_count: 0,
-            reconnect_count: 0,
             latest_slot: 0,
             highest_slot: 0,
         }
@@ -144,12 +138,8 @@ pub async fn run(
     grpc_override: Option<&str>,
     fallback_overrides: &[String],
 ) -> CliResult<()> {
-    let raw = std::fs::read_to_string(&args.config).map_err(|e| {
-        format!(
-            "Failed to read stream config '{}': {}",
-            args.config, e
-        )
-    })?;
+    let raw = std::fs::read_to_string(&args.config)
+        .map_err(|e| format!("Failed to read stream config '{}': {}", args.config, e))?;
 
     let expanded = shellexpand::env(&raw)
         .map_err(|e| format!("Failed to expand env vars in stream config: {}", e))?;
@@ -183,42 +173,95 @@ pub async fn run(
 
     print_header(&endpoints, &stream_config);
 
-    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+    let fallback_refs: Vec<&str> = endpoints[1..].iter().map(|s| s.as_str()).collect();
+    let retry = RetryPolicy {
+        initial_delay: Duration::from_millis(stream_config.reconnect.initial_delay_ms),
+        max_delay: Duration::from_millis(stream_config.reconnect.max_delay_ms),
+        multiplier: stream_config.reconnect.multiplier,
+        max_attempts: stream_config.reconnect.max_retries as u32,
+    };
+
+    let client = JetstreamClientBuilder::new()
+        .url(&endpoints[0])
+        .fallback_urls(&fallback_refs)
+        .retry(retry)
+        .timeout_secs(stream_config.timeout_secs)
+        .keepalive_secs(stream_config.tcp_keepalive_secs)
+        .build()?;
+
+    let mut stream = client.subscribe(subscribe_request);
+
+    eprintln!(
+        "  {} {}",
+        "✓".green().bold(),
+        "Connected, streaming events".green()
+    );
+    eprintln!();
+
+    let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
     tokio::spawn(async move {
         let _ = signal::ctrl_c().await;
         let _ = shutdown_tx.send(true);
     });
 
     let mut stats = StreamStats::new();
-    run_with_reconnect(
-        &endpoints,
-        &stream_config,
-        &subscribe_request,
-        shutdown_rx,
-        &mut stats,
-    )
-    .await?;
+    let mut stats_interval = tokio::time::interval(Duration::from_secs(60));
+    stats_interval.tick().await;
+
+    loop {
+        tokio::select! {
+            update = stream.next() => {
+                match update {
+                    Some(Ok(update)) => {
+                        let filters = &update.filters;
+                        match update.update_oneof {
+                            Some(UpdateOneof::Transaction(tx_update)) => {
+                                stats.tx_count += 1;
+                                stats.update_slot(tx_update.slot);
+                                print_transaction(&tx_update, filters);
+                            }
+                            Some(UpdateOneof::Account(acct_update)) => {
+                                stats.acct_count += 1;
+                                stats.update_slot(acct_update.slot);
+                                print_account(&acct_update, filters);
+                            }
+                            _ => {}
+                        }
+                    }
+                    Some(Err(e)) => {
+                        eprintln!("  {} Stream error: {}", "✗".red().bold(), e);
+                        break;
+                    }
+                    None => {
+                        eprintln!("  {} Stream ended", "■".yellow().bold());
+                        break;
+                    }
+                }
+            }
+            _ = stats_interval.tick() => {
+                print_stats(&stats);
+            }
+            _ = shutdown_rx.changed() => {
+                if *shutdown_rx.borrow() {
+                    eprintln!();
+                    eprintln!("  {} Shutting down gracefully...", "■".yellow().bold());
+                    break;
+                }
+            }
+        }
+    }
 
     print_summary(&stats);
-
     Ok(())
 }
 
 fn print_header(endpoints: &[String], config: &StreamConfig) {
     println!();
-    println!(
-        "  {} OrbitFlare Jetstream",
-        "●".green().bold()
-    );
+    println!("  {} OrbitFlare Jetstream", "●".green().bold());
     println!("  {} {}", "Endpoint:".dimmed(), endpoints[0].cyan());
     if endpoints.len() > 1 {
         for (i, fb) in endpoints[1..].iter().enumerate() {
-            println!(
-                "  {} fallback #{}: {}",
-                "".dimmed(),
-                i + 1,
-                fb.cyan()
-            );
+            println!("  {} fallback #{}: {}", "".dimmed(), i + 1, fb.cyan());
         }
     }
 
@@ -236,11 +279,7 @@ fn print_header(endpoints: &[String], config: &StreamConfig) {
         );
         for (name, filter) in &config.transactions {
             if filter.account_include.is_empty() {
-                println!(
-                    "    {} {} (all transactions)",
-                    "→".dimmed(),
-                    name.bold()
-                );
+                println!("    {} {} (all transactions)", "→".dimmed(), name.bold());
             } else {
                 for addr in &filter.account_include {
                     println!(
@@ -339,190 +378,8 @@ fn build_subscribe_request(config: &StreamConfig) -> SubscribeRequest {
     }
 }
 
-async fn run_with_reconnect(
-    endpoints: &[String],
-    config: &StreamConfig,
-    subscribe_request: &SubscribeRequest,
-    mut shutdown_rx: watch::Receiver<bool>,
-    stats: &mut StreamStats,
-) -> CliResult<()> {
-    let mut delay_ms = config.reconnect.initial_delay_ms;
-    let mut attempt: u64 = 0;
-    let mut endpoint_idx: usize = 0;
-
-    loop {
-        if *shutdown_rx.borrow() {
-            return Ok(());
-        }
-
-        attempt += 1;
-        let endpoint = &endpoints[endpoint_idx];
-
-        match connect_and_stream(endpoint, config, subscribe_request, &mut shutdown_rx, stats).await
-        {
-            Ok(()) => {
-                return Ok(());
-            }
-            Err(e) => {
-                if config.reconnect.max_retries > 0 && attempt >= config.reconnect.max_retries {
-                    eprintln!(
-                        "  {} Max retries ({}) reached. Giving up.",
-                        "✗".red().bold(),
-                        config.reconnect.max_retries
-                    );
-                    return Err(e);
-                }
-
-                stats.reconnect_count += 1;
-
-                let next_idx = (endpoint_idx + 1) % endpoints.len();
-                let switching = next_idx != endpoint_idx || endpoints.len() > 1;
-
-                if switching && endpoints.len() > 1 {
-                    endpoint_idx = next_idx;
-                    eprintln!(
-                        "  {} {} — switching to {} (attempt #{})",
-                        "✗".red().bold(),
-                        e,
-                        endpoints[endpoint_idx].cyan(),
-                        attempt,
-                    );
-                    delay_ms = config.reconnect.initial_delay_ms;
-                } else {
-                    eprintln!(
-                        "  {} {} (attempt #{}, reconnecting in {}ms...)",
-                        "✗".red().bold(),
-                        e,
-                        attempt,
-                        delay_ms,
-                    );
-
-                    tokio::select! {
-                        _ = tokio::time::sleep(Duration::from_millis(delay_ms)) => {}
-                        _ = shutdown_rx.changed() => {
-                            if *shutdown_rx.borrow() {
-                                return Ok(());
-                            }
-                        }
-                    }
-
-                    delay_ms =
-                        ((delay_ms as f64) * config.reconnect.multiplier) as u64;
-                    delay_ms = delay_ms.min(config.reconnect.max_delay_ms);
-                }
-            }
-        }
-    }
-}
-
-async fn connect_and_stream(
-    endpoint: &str,
-    config: &StreamConfig,
-    subscribe_request: &SubscribeRequest,
-    shutdown_rx: &mut watch::Receiver<bool>,
-    stats: &mut StreamStats,
-) -> CliResult<()> {
-    eprintln!(
-        "  {} Connecting to {}...",
-        "→".dimmed(),
-        endpoint.cyan()
-    );
-
-    let channel = Channel::from_shared(endpoint.to_string())
-        .map_err(|e| format!("Invalid endpoint URL: {}", e))?
-        .timeout(Duration::from_secs(config.timeout_secs))
-        .tcp_keepalive(Some(Duration::from_secs(config.tcp_keepalive_secs)))
-        .connect_timeout(Duration::from_secs(config.timeout_secs))
-        .connect()
-        .await
-        .map_err(|e| format!("Connection failed: {}", e))?;
-
-    let mut client = JetstreamClient::new(channel);
-
-    let outbound = tokio_stream::iter(vec![subscribe_request.clone()]);
-    let response = client
-        .subscribe(outbound)
-        .await
-        .map_err(|e| format!("Subscribe failed: {}", e))?;
-    let mut inbound = response.into_inner();
-
-    eprintln!(
-        "  {} {}",
-        "✓".green().bold(),
-        "Connected — streaming events".green()
-    );
-    eprintln!();
-
-    let mut ping_interval = tokio::time::interval(Duration::from_secs(30));
-    ping_interval.tick().await;
-
-    let mut stats_interval = tokio::time::interval(Duration::from_secs(60));
-    stats_interval.tick().await;
-
-    let connected_at = Instant::now();
-
-    loop {
-        tokio::select! {
-
-            msg = inbound.next() => {
-                match msg {
-                    Some(Ok(update)) => {
-                        let filters = &update.filters;
-                        match update.update_oneof {
-                            Some(UpdateOneof::Transaction(tx_update)) => {
-                                stats.tx_count += 1;
-                                stats.update_slot(tx_update.slot);
-                                print_transaction(&tx_update, filters);
-                            }
-                            Some(UpdateOneof::Account(acct_update)) => {
-                                stats.acct_count += 1;
-                                stats.update_slot(acct_update.slot);
-                                print_account(&acct_update, filters);
-                            }
-                            Some(UpdateOneof::Ping(_)) => {
-                                stats.ping_count += 1;
-                            }
-                            Some(UpdateOneof::Pong(pong)) => {
-                                let elapsed = connected_at.elapsed();
-                                eprintln!(
-                                    "  {} pong id={} (uptime {}s)",
-                                    "♥".green().dimmed(),
-                                    pong.id,
-                                    elapsed.as_secs()
-                                );
-                            }
-                            None => {}
-                        }
-                    }
-                    Some(Err(e)) => {
-                        return Err(format!("Stream error: {}", e).into());
-                    }
-                    None => {
-                        return Err("Stream ended unexpectedly".into());
-                    }
-                }
-            }
-            _ = ping_interval.tick() => {
-            }
-            _ = stats_interval.tick() => {
-                print_stats(stats);
-            }
-            _ = shutdown_rx.changed() => {
-                if *shutdown_rx.borrow() {
-                    eprintln!();
-                    eprintln!(
-                        "  {} Shutting down gracefully...",
-                        "■".yellow().bold()
-                    );
-                    return Ok(());
-                }
-            }
-        }
-    }
-}
-
 fn print_transaction(
-    tx: &crate::jetstream_proto::jetstream::SubscribeUpdateTransaction,
+    tx: &orbitflare_sdk::proto::jetstream::SubscribeUpdateTransaction,
     filters: &[String],
 ) {
     let now = chrono::Local::now().format("%H:%M:%S%.3f");
@@ -594,7 +451,7 @@ fn print_transaction(
 }
 
 fn print_account(
-    acct: &crate::jetstream_proto::jetstream::SubscribeUpdateAccount,
+    acct: &orbitflare_sdk::proto::jetstream::SubscribeUpdateAccount,
     filters: &[String],
 ) {
     let now = chrono::Local::now().format("%H:%M:%S%.3f");
@@ -643,13 +500,11 @@ fn print_account(
 
 fn print_stats(stats: &StreamStats) {
     eprintln!(
-        "  {} uptime={} tx={} acct={} pings={} reconnects={} slot={} ",
+        "  {} uptime={} tx={} acct={} slot={} ",
         "STATS".blue().bold(),
         stats.format_uptime(),
         stats.tx_count,
         stats.acct_count,
-        stats.ping_count,
-        stats.reconnect_count,
         format_slot(stats.latest_slot),
     );
 }
@@ -660,8 +515,6 @@ fn print_summary(stats: &StreamStats) {
     eprintln!("  {} Uptime:       {}", "│".dimmed(), stats.format_uptime());
     eprintln!("  {} Transactions: {}", "│".dimmed(), stats.tx_count);
     eprintln!("  {} Accounts:     {}", "│".dimmed(), stats.acct_count);
-    eprintln!("  {} Pings:        {}", "│".dimmed(), stats.ping_count);
-    eprintln!("  {} Reconnects:   {}", "│".dimmed(), stats.reconnect_count);
     eprintln!(
         "  {} Highest slot: {}",
         "│".dimmed(),
@@ -718,7 +571,11 @@ fn identify_program(program_id: &str) -> String {
         "Stake11111111111111111111111111111111111111" => "Stake Program".to_string(),
         _ => {
             if program_id.len() > 16 {
-                format!("{}...{}", &program_id[..8], &program_id[program_id.len() - 4..])
+                format!(
+                    "{}...{}",
+                    &program_id[..8],
+                    &program_id[program_id.len() - 4..]
+                )
             } else {
                 program_id.to_string()
             }

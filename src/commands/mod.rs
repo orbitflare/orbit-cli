@@ -9,3 +9,4 @@ pub mod ping;
 pub mod plan;
 pub mod rpc;
 pub mod template;
+pub mod ws;

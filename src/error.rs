@@ -36,6 +36,9 @@ pub enum CliError {
     #[error("wallet_not_linked")]
     WalletNotLinked,
 
+    #[error(transparent)]
+    Sdk(#[from] orbitflare_sdk::Error),
+
     #[error("{0}")]
     Other(String),
 }

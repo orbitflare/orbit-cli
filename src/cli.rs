@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(
     name = "orbitflare",
-    version = "0.2.0",
+    version = "0.3.0",
     about = "OrbitFlare Developer CLI",
     long_about = "The single entry point for everything a developer needs from OrbitFlare:\n\
                   streaming on-chain data, querying the blockchain, scaffolding projects, and monitoring usage."
@@ -35,6 +35,10 @@ pub struct Cli {
     /// Override gRPC endpoint
     #[arg(long, global = true)]
     pub grpc_url: Option<String>,
+
+    /// Override WebSocket endpoint (default: derived from RPC URL)
+    #[arg(long, global = true)]
+    pub ws_url: Option<String>,
 
     /// Fallback URLs (tried in order if primary fails; applies to RPC or gRPC depending on command)
     #[arg(long = "fallback-url", global = true)]
@@ -84,6 +88,11 @@ pub enum Commands {
     Rpc {
         #[command(subcommand)]
         command: RpcCommands,
+    },
+    /// Real-time WebSocket subscriptions (Solana pubsub)
+    Ws {
+        #[command(subcommand)]
+        command: WsCommands,
     },
     /// Scaffold projects from templates
     Template(TemplateArgs),
@@ -170,6 +179,29 @@ pub struct GrpcArgs {
     /// Path to gRPC stream config YAML file
     #[arg(long)]
     pub config: String,
+}
+
+
+#[derive(Subcommand)]
+pub enum WsCommands {
+    /// Subscribe to slot updates
+    Slot,
+    /// Subscribe to account changes
+    Account {
+        /// Account address
+        address: String,
+    },
+    /// Subscribe to transaction logs
+    Logs {
+        /// Limit to logs mentioning these addresses (can be passed multiple times)
+        #[arg(long = "mentions")]
+        mentions: Vec<String>,
+    },
+    /// Subscribe to signature confirmation
+    Signature {
+        /// Transaction signature
+        signature: String,
+    },
 }
 
 

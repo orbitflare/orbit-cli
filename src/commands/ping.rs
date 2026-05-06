@@ -1,7 +1,7 @@
 use crate::error::{CliError, CliResult};
-use crate::jetstream_proto::jetstream::jetstream_client::JetstreamClient;
 use crate::output;
-use crate::yellowstone_proto::geyser::geyser_client::GeyserClient;
+use orbitflare_sdk::proto::geyser::geyser_client::GeyserClient;
+use orbitflare_sdk::proto::jetstream::jetstream_client::JetstreamClient;
 use colored::Colorize;
 use comfy_table::{
     modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Cell, Color as TColor, ContentArrangement,
@@ -328,7 +328,7 @@ async fn check_jetstream(url: &str) -> Result<(), CliError> {
     let channel = connect_grpc(url).await?;
     let mut client = JetstreamClient::new(channel);
     client
-        .ping(crate::jetstream_proto::jetstream::PingRequest { count: 1 })
+        .ping(orbitflare_sdk::proto::jetstream::PingRequest { count: 1 })
         .await
         .map_err(|e| CliError::from(format!("ping failed: {}", e.message())))?;
     Ok(())
@@ -338,7 +338,7 @@ async fn check_geyser(url: &str) -> Result<(), CliError> {
     let channel = connect_grpc(url).await?;
     let mut client = GeyserClient::new(channel);
     client
-        .ping(crate::yellowstone_proto::geyser::PingRequest { count: 1 })
+        .ping(orbitflare_sdk::proto::geyser::PingRequest { count: 1 })
         .await
         .map_err(|e| CliError::from(format!("ping failed: {}", e.message())))?;
     Ok(())

@@ -1,8 +1,8 @@
 use crate::cli::RpcCommands;
 use crate::error::CliResult;
 use crate::output;
-use crate::rpc_client::RpcClient;
 use colored::Colorize;
+use orbitflare_sdk::RpcClient;
 use comfy_table::{
     modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Cell, Color as TColor,
     ContentArrangement, Table,
@@ -40,7 +40,7 @@ fn new_table() -> Table {
 }
 async fn account(address: &str, rpc: &RpcClient) -> CliResult<()> {
     let result = rpc
-        .call(
+        .request(
             "getAccountInfo",
             json!([address, {"encoding": "base64", "commitment": rpc.commitment()}]),
         )
@@ -92,7 +92,7 @@ async fn account(address: &str, rpc: &RpcClient) -> CliResult<()> {
 }
 async fn tokens(wallet: &str, rpc: &RpcClient) -> CliResult<()> {
     let result = rpc
-        .call(
+        .request(
             "getTokenAccountsByOwner",
             json!([
                 wallet,
@@ -146,7 +146,7 @@ async fn tokens(wallet: &str, rpc: &RpcClient) -> CliResult<()> {
 }
 async fn balance(address: &str, rpc: &RpcClient) -> CliResult<()> {
     let result = rpc
-        .call(
+        .request(
             "getBalance",
             json!([address, {"commitment": rpc.commitment()}]),
         )
@@ -179,7 +179,7 @@ async fn balance(address: &str, rpc: &RpcClient) -> CliResult<()> {
 }
 async fn tx(signature: &str, rpc: &RpcClient) -> CliResult<()> {
     let result = rpc
-        .call(
+        .request(
             "getTransaction",
             json!([
                 signature,
@@ -279,7 +279,7 @@ async fn history(
     rpc: &RpcClient,
 ) -> CliResult<()> {
     let result = rpc
-        .call(
+        .request(
             "getSignaturesForAddress",
             json!([wallet, {"limit": limit, "commitment": rpc.commitment()}]),
         )
@@ -361,7 +361,7 @@ async fn program_accounts(
     config["dataSlice"] = json!({"offset": 0, "length": 0});
 
     let result = rpc
-        .call("getProgramAccounts", json!([program_id, config]))
+        .request("getProgramAccounts", json!([program_id, config]))
         .await?;
 
     if output::is_json() {
@@ -407,10 +407,10 @@ async fn program_accounts(
 }
 async fn slot(rpc: &RpcClient) -> CliResult<()> {
     let confirmed = rpc
-        .call("getSlot", json!([{"commitment": "confirmed"}]))
+        .request("getSlot", json!([{"commitment": "confirmed"}]))
         .await?;
     let finalized = rpc
-        .call("getSlot", json!([{"commitment": "finalized"}]))
+        .request("getSlot", json!([{"commitment": "finalized"}]))
         .await?;
 
     if output::is_json() {
@@ -445,7 +445,7 @@ async fn slot(rpc: &RpcClient) -> CliResult<()> {
 }
 async fn epoch(rpc: &RpcClient) -> CliResult<()> {
     let result = rpc
-        .call(
+        .request(
             "getEpochInfo",
             json!([{"commitment": rpc.commitment()}]),
         )
@@ -494,7 +494,7 @@ async fn epoch(rpc: &RpcClient) -> CliResult<()> {
 }
 async fn blockhash(rpc: &RpcClient) -> CliResult<()> {
     let result = rpc
-        .call(
+        .request(
             "getLatestBlockhash",
             json!([{"commitment": rpc.commitment()}]),
         )
@@ -528,9 +528,9 @@ async fn blockhash(rpc: &RpcClient) -> CliResult<()> {
 }
 async fn stats(rpc: &RpcClient) -> CliResult<()> {
     let perf = rpc
-        .call("getRecentPerformanceSamples", json!([4]))
+        .request("getRecentPerformanceSamples", json!([4]))
         .await?;
-    let vote_accounts = rpc.call("getVoteAccounts", json!([])).await?;
+    let vote_accounts = rpc.request("getVoteAccounts", json!([])).await?;
 
     if output::is_json() {
         let combined = json!({"performanceSamples": perf, "voteAccounts": vote_accounts});
@@ -610,7 +610,7 @@ async fn priority_fees(
         json!([])
     };
 
-    let result = rpc.call("getRecentPrioritizationFees", params).await?;
+    let result = rpc.request("getRecentPrioritizationFees", params).await?;
 
     if output::is_json() {
         println!("{}", serde_json::to_string_pretty(&result)?);
@@ -677,7 +677,7 @@ async fn raw(body: &str, rpc: &RpcClient) -> CliResult<()> {
         .ok_or("Missing \"method\" in JSON body")?;
     let params = parsed.get("params").cloned().unwrap_or(json!([]));
 
-    let result = rpc.call(method, params).await?;
+    let result = rpc.request(method, params).await?;
 
     if output::is_json() || output::is_raw() {
         println!("{}", serde_json::to_string_pretty(&result)?);
