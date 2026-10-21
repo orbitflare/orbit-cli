@@ -160,7 +160,7 @@ pub async fn run(args: GrpcArgs, primary: &str, fallbacks: &[String]) -> CliResu
     let expanded = shellexpand::env(&raw)
         .map_err(|e| format!("Failed to expand env vars in stream config: {}", e))?;
 
-    let stream_config: StreamConfig = serde_yml::from_str(&expanded)
+    let stream_config: StreamConfig = serde_norway::from_str(&expanded)
         .map_err(|e| format!("Failed to parse stream config: {}", e))?;
 
     let mut endpoints = vec![primary.to_string()];

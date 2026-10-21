@@ -145,7 +145,7 @@ impl StreamStats {
 fn parse_config(raw: &str) -> CliResult<StreamConfig> {
     let expanded = shellexpand::env(raw)
         .map_err(|e| format!("Failed to expand env vars in stream config: {}", e))?;
-    let config: StreamConfig = serde_yml::from_str(&expanded)
+    let config: StreamConfig = serde_norway::from_str(&expanded)
         .map_err(|e| format!("Failed to parse stream config: {}", e))?;
 
     if config.accounts.as_ref().is_some_and(|a| !a.is_empty()) {

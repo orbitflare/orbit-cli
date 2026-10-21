@@ -201,14 +201,14 @@ impl Config {
             return Ok(Self::default());
         }
         let contents = std::fs::read_to_string(&path)?;
-        let config: Config = serde_yml::from_str(&contents)?;
+        let config: Config = serde_norway::from_str(&contents)?;
         Ok(config)
     }
 
     pub fn save(&self) -> CliResult<()> {
         let dir = Self::dir();
         std::fs::create_dir_all(&dir)?;
-        let contents = serde_yml::to_string(self)?;
+        let contents = serde_norway::to_string(self)?;
         std::fs::write(Self::path(), contents)?;
         Ok(())
     }

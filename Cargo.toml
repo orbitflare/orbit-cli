@@ -39,7 +39,7 @@ wincode = "0.5"
 tonic = "0.14.5"
 tokio-stream = "0.1.18"
 
-serde_yml = "0.0.13"
+serde_norway = "0.9.42"
 shellexpand = "3.1.2"
 
 base64 = "0.23"
