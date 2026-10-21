@@ -18,10 +18,11 @@ pub async fn run(cmd: AuthCommands) -> CliResult<()> {
             wallet,
             profile,
         } => login(api_key, wallet, profile).await,
-        AuthCommands::Logout => logout(),
+        AuthCommands::Logout => logout().await,
         AuthCommands::Status => status().await,
         AuthCommands::Switch { profile } => switch(profile),
         AuthCommands::SetLicenseKey { key } => set_license_key(key),
+        AuthCommands::SetApexKey { key } => set_apex_key(key),
     }
 }
 
@@ -323,6 +324,7 @@ async fn status() -> CliResult<()> {
     let stored_api_key = keyring_store::get_secret(&profile_name, "api_key");
     let stored_token = keyring_store::get_secret(&profile_name, "token");
     let stored_license_key = keyring_store::get_secret(&profile_name, "license_key");
+    let stored_apex_key = keyring_store::get_secret(&profile_name, "apex_key");
 
     let api = OrbitApi::with_api_key(stored_api_key.clone());
 
@@ -350,6 +352,7 @@ async fn status() -> CliResult<()> {
                     "api_key": stored_api_key.as_deref().map(mask_token),
                     "token": stored_token.as_deref().map(mask_token),
                     "license_key": stored_license_key.as_deref().map(mask_token),
+                    "apex_key": stored_apex_key.as_deref().map(mask_token),
                 });
                 println!("{}", serde_json::to_string_pretty(&json)?);
             } else {
@@ -391,6 +394,9 @@ async fn status() -> CliResult<()> {
                 if let Some(ref lk) = stored_license_key {
                     table.add_row(vec![Cell::new("License Key"), Cell::new(mask_token(lk))]);
                 }
+                if let Some(ref ak) = stored_apex_key {
+                    table.add_row(vec![Cell::new("Apex Key"), Cell::new(mask_token(ak))]);
+                }
 
                 println!("{table}\n");
             }
@@ -416,10 +422,21 @@ async fn status() -> CliResult<()> {
     Ok(())
 }
 
-fn logout() -> CliResult<()> {
+async fn logout() -> CliResult<()> {
     let mut config = Config::load()?;
 
     for profile_name in config.auth.profiles.keys() {
+        if let Some(token) =
+            keyring_store::get_secret(profile_name, "token").filter(|t| !t.is_empty())
+            && let Err(e) = OrbitApi::with_token(&token).logout().await
+        {
+            eprintln!(
+                "  {} Could not revoke session for '{}': {}",
+                "!".yellow(),
+                profile_name,
+                e
+            );
+        }
         let _ = keyring_store::delete_profile_secrets(profile_name);
     }
 
@@ -453,6 +470,19 @@ fn set_license_key(key: String) -> CliResult<()> {
     keyring_store::store_secret(profile_name, "license_key", &key)?;
     println!(
         "  {} License key stored for profile '{}'",
+        "✓".green().bold(),
+        profile_name
+    );
+    Ok(())
+}
+
+fn set_apex_key(key: String) -> CliResult<()> {
+    let config = Config::load()?;
+    let profile_name = config.auth.default_profile.as_deref().unwrap_or("default");
+
+    keyring_store::store_secret(profile_name, "apex_key", &key)?;
+    println!(
+        "  {} Apex key stored for profile '{}'",
         "✓".green().bold(),
         profile_name
     );

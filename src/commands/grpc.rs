@@ -1,16 +1,14 @@
 use crate::cli::GrpcArgs;
-use crate::config::Config;
 use crate::error::CliResult;
 use colored::Colorize;
 use orbitflare_sdk::proto::geyser::{
     SlotStatus, SubscribeRequest, SubscribeRequestFilterAccounts, SubscribeRequestFilterSlots,
-    SubscribeRequestFilterTransactions, SubscribeRequestPing, subscribe_update::UpdateOneof,
+    SubscribeRequestFilterTransactions, subscribe_update::UpdateOneof,
 };
 use orbitflare_sdk::{GeyserClientBuilder, RetryPolicy};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use tokio::signal;
 
 #[derive(Deserialize)]
 struct StreamConfig {
@@ -155,12 +153,7 @@ impl StreamStats {
     }
 }
 
-pub async fn run(
-    args: GrpcArgs,
-    config: &Config,
-    grpc_override: Option<&str>,
-    fallback_overrides: &[String],
-) -> CliResult<()> {
+pub async fn run(args: GrpcArgs, primary: &str, fallbacks: &[String]) -> CliResult<()> {
     let raw = std::fs::read_to_string(&args.config)
         .map_err(|e| format!("Failed to read gRPC stream config '{}': {}", args.config, e))?;
 
@@ -170,23 +163,8 @@ pub async fn run(
     let stream_config: StreamConfig = serde_yml::from_str(&expanded)
         .map_err(|e| format!("Failed to parse stream config: {}", e))?;
 
-    let primary = grpc_override
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| config.endpoints.grpc.url.clone());
-
-    if primary.is_empty() {
-        return Err(
-            "No gRPC endpoint configured. Set endpoints.grpc.url in ~/.orbitflare/config.yml"
-                .into(),
-        );
-    }
-
-    let mut endpoints = vec![primary];
-    if !fallback_overrides.is_empty() {
-        endpoints.extend(fallback_overrides.iter().cloned());
-    } else {
-        endpoints.extend(config.endpoints.grpc.fallback_url.clone());
-    }
+    let mut endpoints = vec![primary.to_string()];
+    endpoints.extend(fallbacks.iter().cloned());
 
     if stream_config.transactions.is_empty()
         && stream_config.accounts.is_empty()
@@ -227,11 +205,7 @@ pub async fn run(
     );
     eprintln!();
 
-    let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
-    tokio::spawn(async move {
-        let _ = signal::ctrl_c().await;
-        let _ = shutdown_tx.send(true);
-    });
+    let mut shutdown_rx = super::shutdown_signal(args.duration);
 
     let mut stats = StreamStats::new();
     let mut stats_interval = tokio::time::interval(Duration::from_secs(60));
@@ -462,7 +436,7 @@ fn build_subscribe_request(config: &StreamConfig) -> SubscribeRequest {
         entry: HashMap::new(),
         commitment: Some(parse_commitment(&config.commitment)),
         accounts_data_slice: vec![],
-        ping: Some(SubscribeRequestPing { id: 1 }),
+        ping: None,
         from_slot: None,
     }
 }

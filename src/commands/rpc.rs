@@ -6,8 +6,72 @@ use comfy_table::{
     Cell, Color as TColor, ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS,
     presets::UTF8_FULL,
 };
-use orbitflare_sdk::RpcClient;
+use orbitflare_sdk::{GetTransactionsFilters, GetTransactionsOptions, RangeFilter, RpcClient};
 use serde_json::{Value, json};
+
+const TOKEN_PROGRAMS: [&str; 2] = [
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+];
+
+struct HistoryQuery {
+    limit: u32,
+    oldest_first: bool,
+    status: Option<String>,
+    token_accounts: Option<String>,
+    since: Option<i64>,
+    until: Option<i64>,
+    page_token: Option<String>,
+}
+
+fn parse_time(s: &str) -> CliResult<i64> {
+    if let Ok(ts) = s.parse::<i64>() {
+        return Ok(ts);
+    }
+    chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+        .ok()
+        .and_then(|d| d.and_hms_opt(0, 0, 0))
+        .map(|dt| dt.and_utc().timestamp())
+        .ok_or_else(|| format!("Invalid time '{}'. Use unix seconds or YYYY-MM-DD", s).into())
+}
+
+fn history_options(q: &HistoryQuery, commitment: &str) -> CliResult<GetTransactionsOptions> {
+    let mut filters = GetTransactionsFilters::new();
+    if let Some(ref status) = q.status {
+        match status.as_str() {
+            "succeeded" | "failed" => filters = filters.status(status),
+            _ => return Err("--status must be succeeded or failed".into()),
+        }
+    }
+    if let Some(ref mode) = q.token_accounts {
+        match mode.as_str() {
+            "none" | "balanceChanged" | "all" => filters = filters.token_accounts(mode),
+            _ => return Err("--token-accounts must be none, balanceChanged or all".into()),
+        }
+    }
+    if q.since.is_some() || q.until.is_some() {
+        filters = filters.block_time(RangeFilter {
+            gte: q.since,
+            lt: q.until,
+            ..Default::default()
+        });
+    }
+    let commitment = if commitment == "finalized" {
+        "finalized"
+    } else {
+        "confirmed"
+    };
+    let mut options = GetTransactionsOptions::new()
+        .transaction_details("signatures")
+        .limit(q.limit.clamp(1, 1000))
+        .sort_order(if q.oldest_first { "asc" } else { "desc" })
+        .commitment(commitment)
+        .filters(filters);
+    if let Some(ref token) = q.page_token {
+        options = options.pagination_token(token);
+    }
+    Ok(options)
+}
 
 pub async fn run(cmd: RpcCommands, rpc: &RpcClient) -> CliResult<()> {
     match cmd {
@@ -15,7 +79,27 @@ pub async fn run(cmd: RpcCommands, rpc: &RpcClient) -> CliResult<()> {
         RpcCommands::Tokens { wallet } => tokens(&wallet, rpc).await,
         RpcCommands::Balance { address } => balance(&address, rpc).await,
         RpcCommands::Tx { signature } => tx(&signature, rpc).await,
-        RpcCommands::History { wallet, limit } => history(&wallet, limit, rpc).await,
+        RpcCommands::History {
+            wallet,
+            limit,
+            oldest_first,
+            status,
+            token_accounts,
+            since,
+            until,
+            page_token,
+        } => {
+            let query = HistoryQuery {
+                limit,
+                oldest_first,
+                status,
+                token_accounts,
+                since: since.as_deref().map(parse_time).transpose()?,
+                until: until.as_deref().map(parse_time).transpose()?,
+                page_token,
+            };
+            history(&wallet, query, rpc).await
+        }
         RpcCommands::ProgramAccounts {
             program_id,
             limit,
@@ -97,16 +181,23 @@ async fn account(address: &str, rpc: &RpcClient) -> CliResult<()> {
     Ok(())
 }
 async fn tokens(wallet: &str, rpc: &RpcClient) -> CliResult<()> {
-    let result = rpc
-        .request(
-            "getTokenAccountsByOwner",
-            json!([
-                wallet,
-                {"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
-                {"encoding": "jsonParsed", "commitment": rpc.commitment()}
-            ]),
-        )
-        .await?;
+    let mut all = Vec::new();
+    for program in TOKEN_PROGRAMS {
+        let r = rpc
+            .request(
+                "getTokenAccountsByOwner",
+                json!([
+                    wallet,
+                    {"programId": program},
+                    {"encoding": "jsonParsed", "commitment": rpc.commitment()}
+                ]),
+            )
+            .await?;
+        if let Some(items) = r["value"].as_array() {
+            all.extend(items.iter().cloned());
+        }
+    }
+    let result = json!({ "value": all });
 
     if output::is_json() {
         println!("{}", serde_json::to_string_pretty(&result)?);
@@ -132,9 +223,14 @@ async fn tokens(wallet: &str, rpc: &RpcClient) -> CliResult<()> {
     );
 
     let mut table = new_table();
-    table.set_header(vec!["#", "Mint", "Balance", "Decimals"]);
+    table.set_header(vec!["#", "Mint", "Balance", "Decimals", "Program"]);
 
     for (i, acct) in accounts.iter().enumerate() {
+        let program = if acct["account"]["owner"].as_str() == Some(TOKEN_PROGRAMS[1]) {
+            "Token-2022"
+        } else {
+            "Token"
+        };
         let info = &acct["account"]["data"]["parsed"]["info"];
         let mint = info["mint"].as_str().unwrap_or("unknown");
         let ui_amount = info["tokenAmount"]["uiAmountString"]
@@ -147,6 +243,7 @@ async fn tokens(wallet: &str, rpc: &RpcClient) -> CliResult<()> {
             Cell::new(mint),
             Cell::new(ui_amount),
             Cell::new(decimals),
+            Cell::new(program),
         ]);
     }
 
@@ -299,35 +396,49 @@ async fn tx(signature: &str, rpc: &RpcClient) -> CliResult<()> {
     println!();
     Ok(())
 }
-async fn history(wallet: &str, limit: u32, rpc: &RpcClient) -> CliResult<()> {
-    let result = rpc
-        .request(
-            "getSignaturesForAddress",
-            json!([wallet, {"limit": limit, "commitment": rpc.commitment()}]),
-        )
-        .await?;
+async fn history(wallet: &str, q: HistoryQuery, rpc: &RpcClient) -> CliResult<()> {
+    let options = history_options(&q, rpc.commitment())?;
+    let page = match rpc.get_transactions_for_address(wallet, options).await {
+        Ok(page) => page,
+        Err(e) if is_method_not_found(&e) && q.page_token.is_none() => {
+            let sigs = rpc.get_signatures_for_address(wallet, q.limit).await?;
+            orbitflare_sdk::GetTransactionsResult {
+                data: sigs,
+                pagination_token: None,
+            }
+        }
+        Err(e) => return Err(e.into()),
+    };
 
     if output::is_json() {
-        println!("{}", serde_json::to_string_pretty(&result)?);
+        let combined = json!({"data": page.data, "paginationToken": page.pagination_token});
+        println!("{}", serde_json::to_string_pretty(&combined)?);
         return Ok(());
     }
     if output::is_raw() {
-        println!("{}", result);
+        println!(
+            "{}",
+            json!({"data": page.data, "paginationToken": page.pagination_token})
+        );
         return Ok(());
     }
 
-    let sigs = result.as_array().ok_or("Invalid response")?;
-
+    let sigs = &page.data;
     if sigs.is_empty() {
         println!("No transactions found for: {}", wallet.cyan());
         return Ok(());
     }
 
     println!(
-        "\n  {} Transaction History for {} (showing {})\n",
+        "\n  {} Transaction History for {} (showing {}, {})\n",
         "●".cyan().bold(),
         truncate_addr(wallet),
-        sigs.len()
+        sigs.len(),
+        if q.oldest_first {
+            "oldest first"
+        } else {
+            "newest first"
+        }
     );
 
     let mut table = new_table();
@@ -349,23 +460,31 @@ async fn history(wallet: &str, limit: u32, rpc: &RpcClient) -> CliResult<()> {
             (Cell::new("✗ Err").fg(TColor::Red), TColor::Red)
         };
 
-        let sig_short = if sig.len() > 20 {
-            format!("{}...{}", &sig[..12], &sig[sig.len() - 4..])
-        } else {
-            sig.to_string()
-        };
-
         table.add_row(vec![
             Cell::new(&time_str),
             status_cell,
             Cell::new(format_number(slot)),
-            Cell::new(sig_short).fg(sig_color),
+            Cell::new(sig).fg(sig_color),
         ]);
     }
 
-    println!("{table}\n");
+    println!("{table}");
+    if let Some(ref token) = page.pagination_token {
+        println!(
+            "\n  {} More results: --page-token {}",
+            "→".dimmed(),
+            token.cyan()
+        );
+    }
+    println!();
     Ok(())
 }
+
+fn is_method_not_found(e: &orbitflare_sdk::Error) -> bool {
+    let msg = e.to_string();
+    msg.contains("-32601") || msg.to_lowercase().contains("method not found")
+}
+
 async fn program_accounts(
     program_id: &str,
     limit: u32,
@@ -585,7 +704,7 @@ async fn stats(rpc: &RpcClient) -> CliResult<()> {
             .map(|s| {
                 let txs = s["numTransactions"].as_u64().unwrap_or(0);
                 let secs = s["samplePeriodSecs"].as_u64().unwrap_or(60);
-                if secs > 0 { txs / secs } else { 0 }
+                txs.checked_div(secs).unwrap_or(0)
             })
             .unwrap_or(0);
 
@@ -595,7 +714,7 @@ async fn stats(rpc: &RpcClient) -> CliResult<()> {
                 .map(|s| {
                     let txs = s["numTransactions"].as_u64().unwrap_or(0);
                     let secs = s["samplePeriodSecs"].as_u64().unwrap_or(60);
-                    if secs > 0 { txs / secs } else { 0 }
+                    txs.checked_div(secs).unwrap_or(0)
                 })
                 .sum();
             total / samples.len() as u64
@@ -763,5 +882,67 @@ fn truncate_addr(addr: &str) -> String {
         format!("{}...{}", &addr[..6], &addr[addr.len() - 4..])
     } else {
         addr.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn query() -> HistoryQuery {
+        HistoryQuery {
+            limit: 10,
+            oldest_first: false,
+            status: None,
+            token_accounts: None,
+            since: None,
+            until: None,
+            page_token: None,
+        }
+    }
+
+    #[test]
+    fn parses_unix_and_date_times() {
+        assert_eq!(parse_time("1704067200").unwrap(), 1_704_067_200);
+        assert_eq!(parse_time("2024-01-01").unwrap(), 1_704_067_200);
+        assert!(parse_time("yesterday").is_err());
+    }
+
+    #[test]
+    fn builds_history_options() {
+        let mut q = query();
+        q.oldest_first = true;
+        q.status = Some("failed".into());
+        q.token_accounts = Some("balanceChanged".into());
+        q.since = Some(100);
+        q.until = Some(200);
+        q.page_token = Some("1:2".into());
+        q.limit = 5000;
+        let v = serde_json::to_value(history_options(&q, "processed").unwrap()).unwrap();
+        assert_eq!(
+            v,
+            json!({
+                "transactionDetails": "signatures",
+                "limit": 1000,
+                "sortOrder": "asc",
+                "paginationToken": "1:2",
+                "commitment": "confirmed",
+                "filters": {
+                    "tokenAccounts": "balanceChanged",
+                    "blockTime": {"gte": 100, "lt": 200},
+                    "status": "failed"
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_bad_history_filters() {
+        let mut q = query();
+        q.status = Some("ok".into());
+        assert!(history_options(&q, "confirmed").is_err());
+        let mut q = query();
+        q.token_accounts = Some("some".into());
+        assert!(history_options(&q, "confirmed").is_err());
     }
 }

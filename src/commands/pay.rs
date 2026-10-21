@@ -97,7 +97,7 @@ fn sign_transaction(unsigned_tx_base64: &str, signing_key: &SigningKey) -> CliRe
     let signature = signing_key.sign(message);
     tx_bytes[1..65].copy_from_slice(&signature.to_bytes());
 
-    Ok(bs58::encode(tx_bytes).into_string())
+    Ok(base64_engine.encode(tx_bytes))
 }
 
 fn val_to_f64(value: &Option<serde_json::Value>) -> f64 {
@@ -112,7 +112,7 @@ fn format_price(value: &Option<serde_json::Value>) -> String {
     format!("${:.2}", val_to_f64(value))
 }
 
-fn confirm_prompt(question: &str) -> CliResult<bool> {
+pub(crate) fn confirm_prompt(question: &str) -> CliResult<bool> {
     print!("{}", question);
     io::stdout().flush()?;
     let mut answer = String::new();
@@ -151,8 +151,8 @@ async fn check_balance(profile: Option<&str>) -> CliResult<()> {
 }
 
 async fn topup(amount: f64, wallet_path: Option<&str>, profile: Option<&str>) -> CliResult<()> {
-    if amount < 5.0 {
-        return Err("Minimum top-up amount is $5 USDC".into());
+    if !(5.0..=10_000.0).contains(&amount) {
+        return Err("Top-up amount must be between $5 and $10,000 USDC".into());
     }
 
     let wallet_path = wallet_path.unwrap_or(DEFAULT_KEYPAIR_PATH);
@@ -517,6 +517,12 @@ async fn order(reference: Option<&str>, history: bool, profile: Option<&str>) ->
     Ok(())
 }
 
+fn money(value: Option<f64>) -> String {
+    value
+        .map(|v| format!("${:.2}", v))
+        .unwrap_or_else(|| "—".into())
+}
+
 async fn invoice(reference: Option<&str>, list: bool, profile: Option<&str>) -> CliResult<()> {
     let api = get_api(profile)?;
 
@@ -525,19 +531,7 @@ async fn invoice(reference: Option<&str>, list: bool, profile: Option<&str>) -> 
         let invoices = api.invoices().await?;
 
         if output::is_json() {
-            let json: Vec<_> = invoices
-                .iter()
-                .map(|inv| {
-                    serde_json::json!({
-                        "id": inv.id,
-                        "reference": inv.reference,
-                        "amount": inv.amount,
-                        "status": inv.status,
-                        "created_at": inv.created_at,
-                    })
-                })
-                .collect();
-            println!("{}", serde_json::to_string_pretty(&json)?);
+            println!("{}", serde_json::to_string_pretty(&invoices)?);
             return Ok(());
         }
 
@@ -551,21 +545,31 @@ async fn invoice(reference: Option<&str>, list: bool, profile: Option<&str>) -> 
             .load_preset(UTF8_FULL)
             .apply_modifier(UTF8_ROUND_CORNERS)
             .set_content_arrangement(ContentArrangement::Dynamic)
-            .set_header(vec!["Reference", "Amount", "Status", "Created"]);
+            .set_header(vec![
+                "Reference",
+                "Type",
+                "Total",
+                "Due",
+                "Status",
+                "Due Date",
+            ]);
 
         for inv in &invoices {
             let status = inv.status.as_deref().unwrap_or("—");
             let status_cell = match status {
                 "paid" => Cell::new(status).fg(TColor::Green),
-                "pending" | "unpaid" => Cell::new(status).fg(TColor::Yellow),
+                "pending" | "partially_paid" => Cell::new(status).fg(TColor::Yellow),
+                "overdue" => Cell::new(status).fg(TColor::Red),
                 _ => Cell::new(status),
             };
 
             table.add_row(vec![
                 Cell::new(inv.reference.as_deref().unwrap_or("—")),
-                Cell::new(format!("${:.2}", inv.amount.unwrap_or(0.0))),
+                Cell::new(inv.invoice_type.as_deref().unwrap_or("—")),
+                Cell::new(money(inv.billing_total)),
+                Cell::new(money(inv.billing_balance)),
                 status_cell,
-                Cell::new(inv.created_at.as_deref().unwrap_or("—")),
+                Cell::new(inv.due_date.as_deref().unwrap_or("—")),
             ]);
         }
 
@@ -574,35 +578,40 @@ async fn invoice(reference: Option<&str>, list: bool, profile: Option<&str>) -> 
         println!();
     } else if let Some(reference) = reference {
         eprintln!("  {} Fetching invoice '{}'...", "→".dimmed(), reference);
-        let invoices = api.invoices().await?;
-        let inv = invoices
-            .iter()
-            .find(|i| i.reference.as_deref() == Some(reference))
-            .ok_or_else(|| format!("Invoice '{}' not found", reference))?;
+        let inv = api.invoice_detail(reference).await?;
 
         if output::is_json() {
-            let json = serde_json::json!({
-                "id": inv.id,
-                "reference": inv.reference,
-                "amount": inv.amount,
-                "status": inv.status,
-                "created_at": inv.created_at,
-            });
-            println!("{}", serde_json::to_string_pretty(&json)?);
+            println!("{}", serde_json::to_string_pretty(&inv)?);
             return Ok(());
         }
 
         println!();
         println!(
             "  Reference: {}",
-            inv.reference.as_deref().unwrap_or("—").cyan()
+            inv.reference.as_deref().unwrap_or(reference).cyan()
         );
         println!(
-            "  Amount:    {}",
-            format!("${:.2}", inv.amount.unwrap_or(0.0)).bold()
+            "  Type:      {}",
+            inv.invoice_type.as_deref().unwrap_or("—")
         );
         println!("  Status:    {}", inv.status.as_deref().unwrap_or("—"));
+        println!("  Subtotal:  {}", money(inv.billing_subtotal));
+        println!("  Tax:       {}", money(inv.billing_tax));
+        if let Some(ref code) = inv.discount_code {
+            println!("  Discount:  {} ({})", money(inv.discount_amount), code);
+        }
+        println!("  Total:     {}", money(inv.billing_total).bold());
+        println!("  Due:       {}", money(inv.billing_balance));
+        println!("  Due date:  {}", inv.due_date.as_deref().unwrap_or("—"));
         println!("  Created:   {}", inv.created_at.as_deref().unwrap_or("—"));
+        for p in &inv.payments {
+            println!(
+                "  Payment:   ${:.2} via {} on {}",
+                p["amount"].as_f64().unwrap_or(0.0),
+                p["gateway"].as_str().unwrap_or("—"),
+                p["payment_date"].as_str().unwrap_or("—")
+            );
+        }
         println!();
     }
 
@@ -639,16 +648,40 @@ async fn renew(invoice_ref: &str, profile: Option<&str>) -> CliResult<()> {
             "  New balance:   ${:.2}",
             result.new_user_balance.unwrap_or(0.0)
         );
-        if let Some(remainder) = result.remainder {
-            if remainder > 0.0 {
-                println!(
-                    "  Remainder:     {}",
-                    format!("${:.2} still due", remainder).yellow()
-                );
-            }
+        if let Some(remainder) = result.remainder
+            && remainder > 0.0
+        {
+            println!(
+                "  Remainder:     {}",
+                format!("${:.2} still due", remainder).yellow()
+            );
         }
         println!();
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::Engine;
+    use ed25519_dalek::Verifier;
+
+    #[test]
+    fn signs_topup_transaction_as_base64() {
+        let key = SigningKey::from_bytes(&[7u8; 32]);
+        let mut unsigned = vec![1u8];
+        unsigned.extend([0u8; 64]);
+        unsigned.extend(b"message bytes");
+        let encoded = base64::engine::general_purpose::STANDARD.encode(&unsigned);
+
+        let signed = sign_transaction(&encoded, &key).unwrap();
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(signed)
+            .unwrap();
+        let sig = ed25519_dalek::Signature::from_bytes(bytes[1..65].try_into().unwrap());
+        assert!(key.verifying_key().verify(&bytes[65..], &sig).is_ok());
+        assert_eq!(&bytes[65..], b"message bytes");
+    }
 }

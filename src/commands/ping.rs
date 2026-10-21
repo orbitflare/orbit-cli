@@ -6,7 +6,7 @@ use comfy_table::{
     presets::UTF8_FULL,
 };
 use orbitflare_sdk::proto::geyser::geyser_client::GeyserClient;
-use orbitflare_sdk::proto::jetstream::jetstream_client::JetstreamClient;
+use orbitflare_sdk::proto::jetstream::v2::jetstream_v2_client::JetstreamV2Client;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tonic::transport::Channel;
@@ -29,18 +29,16 @@ pub async fn run(
     let filter = service.as_deref();
 
     let do_rpc = matches!(filter, None | Some("rpc"));
-    let do_jetstream = matches!(filter, None | Some("jetstream") | Some("grpc"));
+    let do_jetstream = matches!(filter, None | Some("jetstream"));
     let do_grpc = matches!(
         filter,
         None | Some("grpc") | Some("yellowstone") | Some("geyser")
     );
 
-    if let Some(s) = filter {
-        if !matches!(s, "rpc" | "jetstream" | "grpc" | "yellowstone" | "geyser") {
-            return Err(
-                format!("Unknown service: '{}'. Available: rpc, jetstream, grpc", s).into(),
-            );
-        }
+    if let Some(s) = filter
+        && !matches!(s, "rpc" | "jetstream" | "grpc" | "yellowstone" | "geyser")
+    {
+        return Err(format!("Unknown service: '{}'. Available: rpc, jetstream, grpc", s).into());
     }
 
     let rpc_count = if do_rpc { rpc_urls.len() } else { 0 };
@@ -345,9 +343,9 @@ async fn check_rpc(client: &reqwest::Client, url: &str) -> Result<(), CliError> 
 
 async fn check_jetstream(url: &str) -> Result<(), CliError> {
     let channel = connect_grpc(url).await?;
-    let mut client = JetstreamClient::new(channel);
+    let mut client = JetstreamV2Client::new(channel);
     client
-        .ping(orbitflare_sdk::proto::jetstream::PingRequest { count: 1 })
+        .ping(orbitflare_sdk::proto::jetstream::v2::PingRequest { count: 1 })
         .await
         .map_err(|e| CliError::from(format!("ping failed: {}", e.message())))?;
     Ok(())
@@ -384,7 +382,7 @@ async fn connect_grpc(url: &str) -> Result<Channel, CliError> {
 fn print_progress(done: usize, total: usize) {
     use std::io::Write;
     let width = 30;
-    let filled = if total > 0 { (done * width) / total } else { 0 };
+    let filled = (done * width).checked_div(total).unwrap_or(0);
     let empty = width - filled;
     let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty),);
     eprint!(

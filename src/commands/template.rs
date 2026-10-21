@@ -4,7 +4,7 @@ use crate::error::CliResult;
 use colored::Colorize;
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, serde::Serialize, Clone)]
 struct TemplateInfo {
     name: String,
     description: String,
@@ -115,8 +115,13 @@ fn list(templates: &[TemplateInfo], filter: Option<&str>) -> CliResult<()> {
         None => templates.iter().collect(),
     };
 
+    if crate::output::is_json() {
+        println!("{}", serde_json::to_string_pretty(&filtered)?);
+        return Ok(());
+    }
+
     println!(
-        "\n  {:<22} {:<10} {:<10} {}",
+        "\n  {:<22} {:<10} {:<13} {}",
         "Template".bold(),
         "Lang".bold(),
         "Level".bold(),
@@ -125,7 +130,7 @@ fn list(templates: &[TemplateInfo], filter: Option<&str>) -> CliResult<()> {
     println!("  {}", "─".repeat(78));
     for t in &filtered {
         println!(
-            "  {:<22} {:<10} {:<10} {}",
+            "  {:<22} {:<10} {:<13} {}",
             t.name, t.lang, t.level, t.description
         );
     }

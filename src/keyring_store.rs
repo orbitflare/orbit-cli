@@ -38,6 +38,7 @@ pub fn delete_profile_secrets(profile: &str) -> CliResult<()> {
     let _ = delete_secret(profile, "api_key");
     let _ = delete_secret(profile, "token");
     let _ = delete_secret(profile, "license_key");
+    let _ = delete_secret(profile, "apex_key");
     Ok(())
 }
 

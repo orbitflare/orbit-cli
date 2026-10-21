@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 const BASE_URL: &str = "https://orbitflare.com/api/customer/v2";
+const PUBLIC_RPC_PLANS_URL: &str = "https://orbitflare.com/api/products/category/rpc-plans";
 
 #[derive(Deserialize)]
 struct ApiResponse<T> {
@@ -218,15 +219,33 @@ pub struct WhitelistedIp {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct InvoiceData {
     #[serde(default)]
-    pub id: Option<u64>,
-    #[serde(default)]
     pub reference: Option<String>,
-    #[serde(default)]
-    pub amount: Option<f64>,
+    #[serde(default, rename = "type")]
+    pub invoice_type: Option<String>,
     #[serde(default)]
     pub status: Option<String>,
     #[serde(default)]
+    pub currency: Option<String>,
+    #[serde(default)]
+    pub billing_subtotal: Option<f64>,
+    #[serde(default)]
+    pub billing_tax: Option<f64>,
+    #[serde(default)]
+    pub billing_total: Option<f64>,
+    #[serde(default)]
+    pub billing_balance: Option<f64>,
+    #[serde(default)]
+    pub due_date: Option<String>,
+    #[serde(default)]
     pub created_at: Option<String>,
+    #[serde(default)]
+    pub licenses: Vec<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discount_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discount_amount: Option<f64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub payments: Vec<serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -341,6 +360,35 @@ pub struct RpcPlan {
     pub base_price: Option<serde_json::Value>,
     #[serde(default)]
     pub limits: Option<serde_json::Value>,
+}
+
+#[derive(Deserialize, Default)]
+struct PublicCatalog {
+    #[serde(default)]
+    products: Vec<RpcPlan>,
+}
+
+pub async fn public_rpc_plans() -> CliResult<Vec<RpcPlan>> {
+    let resp = Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()?
+        .get(PUBLIC_RPC_PLANS_URL)
+        .send()
+        .await?;
+    let status = resp.status();
+    let text = resp.text().await?;
+    if !status.is_success() {
+        return Err(format!(
+            "GET {} — HTTP {}: {}",
+            PUBLIC_RPC_PLANS_URL,
+            status.as_u16(),
+            extract_error(&text)
+        )
+        .into());
+    }
+    let parsed: serde_json::Value = serde_json::from_str(&text)?;
+    let catalog: PublicCatalog = serde_json::from_value(parsed["data"].clone()).unwrap_or_default();
+    Ok(catalog.products)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -536,6 +584,17 @@ pub struct CreatedApiKey {
     pub created_at: Option<String>,
 }
 
+fn unwrap_field<T: serde::de::DeserializeOwned>(
+    value: serde_json::Value,
+    key: &str,
+) -> CliResult<T> {
+    let inner = match value.get(key) {
+        Some(v) if v.is_object() => v.clone(),
+        _ => value,
+    };
+    Ok(serde_json::from_value(inner)?)
+}
+
 fn extract_error(body: &str) -> String {
     let trimmed = body.trim();
     if let Ok(parsed) = serde_json::from_str::<ApiResponse<serde_json::Value>>(trimmed) {
@@ -704,6 +763,9 @@ impl OrbitApi {
         let status = resp.status();
         let text = resp.text().await?;
         if !status.is_success() {
+            if status.as_u16() == 404 {
+                return Err(CliError::WalletNotLinked);
+            }
             if let Ok(parsed) = serde_json::from_str::<ApiResponse<serde_json::Value>>(&text)
                 && parsed.error.as_deref() == Some("wallet_not_linked")
             {
@@ -800,24 +862,15 @@ impl OrbitApi {
     pub async fn profile(&self) -> CliResult<ProfileData> {
         let req = self.client.get(format!("{}/profile", BASE_URL));
         let resp = self.auth_header(req).send().await?;
-        let status = resp.status();
-        let text = resp.text().await?;
-        if !status.is_success() {
-            return Err(format!(
-                "GET /profile — HTTP {}: {}",
-                status.as_u16(),
-                extract_error(&text)
-            )
-            .into());
-        }
-        let parsed: ApiResponse<ProfileData> = serde_json::from_str(&text)?;
-        parsed.data.ok_or_else(|| {
-            format!(
-                "No data in response: {}",
-                parsed.message.unwrap_or_default()
-            )
-            .into()
-        })
+        let data: serde_json::Value = self.parse_response(resp, "GET /profile").await?;
+        unwrap_field(data, "profile")
+    }
+
+    pub async fn logout(&self) -> CliResult<()> {
+        let req = self.client.post(format!("{}/auth/logout", BASE_URL));
+        let resp = self.auth_header(req).send().await?;
+        self.parse_json_response(resp, "POST /auth/logout").await?;
+        Ok(())
     }
 
     pub async fn balance(&self) -> CliResult<BalanceData> {
@@ -881,25 +934,21 @@ impl OrbitApi {
     }
 
     pub async fn invoices(&self) -> CliResult<Vec<InvoiceData>> {
-        let req = self.client.get(format!("{}/invoices", BASE_URL));
+        let req = self
+            .client
+            .get(format!("{}/invoices?per_page=50", BASE_URL));
         let resp = self.auth_header(req).send().await?;
-        let status = resp.status();
-        let text = resp.text().await?;
-        if !status.is_success() {
-            return Err(format!(
-                "GET /invoices — HTTP {}: {}",
-                status.as_u16(),
-                extract_error(&text)
-            )
-            .into());
-        }
-        if let Ok(parsed) = serde_json::from_str::<ApiResponse<PaginatedInvoices>>(&text)
-            && let Some(paginated) = parsed.data
-        {
-            return Ok(paginated.data);
-        }
-        let parsed: ApiResponse<Vec<InvoiceData>> = serde_json::from_str(&text)?;
-        Ok(parsed.data.unwrap_or_default())
+        let data: PaginatedInvoices = self.parse_response(resp, "GET /invoices").await?;
+        Ok(data.data)
+    }
+
+    pub async fn invoice_detail(&self, reference: &str) -> CliResult<InvoiceData> {
+        let req = self
+            .client
+            .get(format!("{}/invoices/{}", BASE_URL, reference));
+        let resp = self.auth_header(req).send().await?;
+        self.parse_response(resp, &format!("GET /invoices/{}", reference))
+            .await
     }
 
     pub async fn api_keys(&self) -> ApiResult<Vec<ApiKeyEntry>> {
@@ -1077,8 +1126,8 @@ impl OrbitApi {
             .post(format!("{}/api-keys", BASE_URL))
             .json(&serde_json::json!({ "name": name }));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<CreatedApiKey>(resp, "POST /api-keys")
-            .await
+        let data: serde_json::Value = self.parse_response(resp, "POST /api-keys").await?;
+        unwrap_field(data, "api_key")
     }
 
     pub async fn update_api_key(
@@ -1126,8 +1175,10 @@ impl OrbitApi {
             .client
             .post(format!("{}/api-keys/{}/regenerate", BASE_URL, id));
         let resp = self.auth_header(req).send().await?;
-        self.parse_response::<CreatedApiKey>(resp, &format!("POST /api-keys/{}/regenerate", id))
-            .await
+        let data: serde_json::Value = self
+            .parse_response(resp, &format!("POST /api-keys/{}/regenerate", id))
+            .await?;
+        unwrap_field(data, "api_key")
     }
 
     pub async fn api_key_add_ip(&self, id: u64, ip: &str) -> ApiResult<ApiKeyEntry> {
@@ -1335,5 +1386,44 @@ impl OrbitApi {
         }
         let parsed: ApiResponse<serde_json::Value> = serde_json::from_str(&text)?;
         Ok(parsed.data.unwrap_or(serde_json::Value::Null))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unwraps_documented_envelopes() {
+        let profile: ProfileData = unwrap_field(
+            serde_json::json!({"profile": {"name": "Ada", "balance": 12.5}}),
+            "profile",
+        )
+        .unwrap();
+        assert_eq!(profile.name.as_deref(), Some("Ada"));
+        assert_eq!(profile.balance, Some(12.5));
+
+        let bare: ProfileData =
+            unwrap_field(serde_json::json!({"name": "Ada"}), "profile").unwrap();
+        assert_eq!(bare.name.as_deref(), Some("Ada"));
+
+        let key: CreatedApiKey = unwrap_field(
+            serde_json::json!({"api_key": {"id": 7, "name": "ci", "key": "k", "enabled": true}}),
+            "api_key",
+        )
+        .unwrap();
+        assert_eq!(key.id, Some(7));
+        assert_eq!(key.key.as_deref(), Some("k"));
+    }
+
+    #[test]
+    fn parses_documented_invoice_list() {
+        let body = r#"{"success":true,"data":{"data":[{"reference":"INV26A1B2C3","type":"renewal","status":"pending","currency":"USD","billing_total":49.0,"billing_balance":49.0,"due_date":"2026-11-01","created_at":"2026-10-01","licenses":[]}],"current_page":1,"last_page":1,"per_page":15,"total":1}}"#;
+        let parsed: ApiResponse<PaginatedInvoices> = serde_json::from_str(body).unwrap();
+        let inv = &parsed.data.unwrap().data[0];
+        assert_eq!(inv.reference.as_deref(), Some("INV26A1B2C3"));
+        assert_eq!(inv.billing_total, Some(49.0));
+        assert_eq!(inv.billing_balance, Some(49.0));
+        assert_eq!(inv.invoice_type.as_deref(), Some("renewal"));
     }
 }

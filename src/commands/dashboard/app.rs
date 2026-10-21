@@ -1,8 +1,6 @@
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::models::{
-    self, ApiKeyItem, CoinPrice, ConnectedAccountItem, Invoice, Service, ServiceInfo,
-};
+use super::models::{ApiKeyItem, CoinPrice, ConnectedAccountItem, Invoice, Service, ServiceInfo};
 use super::theme::ThemeName;
 #[derive(Clone, Debug)]
 pub enum Action {
@@ -172,6 +170,8 @@ pub struct App {
     pub tick_count: u64,
 
     pub prices: Vec<CoinPrice>,
+    pub prices_enabled: bool,
+    pub prices_updated: Option<std::time::Instant>,
     pub ticker_offset: usize,
 
     pub greeting: String,
@@ -282,7 +282,9 @@ impl App {
             running: true,
             tick_count: 0,
 
-            prices: models::ticker_prices(),
+            prices: Vec::new(),
+            prices_enabled: false,
+            prices_updated: None,
             ticker_offset: 0,
 
             greeting,
@@ -352,19 +354,20 @@ impl App {
         }
     }
 
-    pub fn seconds_since_update(&self) -> u64 {
-        0
+    pub fn seconds_since_update(&self) -> Option<u64> {
+        self.prices_updated.map(|t| t.elapsed().as_secs())
+    }
+
+    pub fn set_prices(&mut self, prices: Vec<CoinPrice>) {
+        self.prices = prices;
+        self.prices_updated = Some(std::time::Instant::now());
     }
 
     pub fn tick(&mut self) {
         self.tick_count += 1;
 
-        if self.tick_count % 2 == 0 {
+        if self.tick_count.is_multiple_of(2) {
             self.ticker_offset += 1;
-        }
-
-        if self.tick_count % 4 == 0 {
-            self.prices = models::ticker_prices();
         }
 
         if self.status_ticks_remaining > 0 {

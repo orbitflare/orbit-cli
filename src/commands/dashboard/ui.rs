@@ -42,10 +42,20 @@ fn render_ticker(frame: &mut Frame, app: &App, area: Rect) {
     let mut spans: Vec<Span> = Vec::new();
 
     spans.push(Span::styled(" \u{25cf} ", Style::default().fg(green_dot)));
-    spans.push(Span::styled(
-        format!("Updated {}s ago  ", app.seconds_since_update()),
-        Style::default().fg(label),
-    ));
+    match app.seconds_since_update() {
+        Some(secs) => spans.push(Span::styled(
+            format!("Prices updated {}s ago  ", secs),
+            Style::default().fg(label),
+        )),
+        None => spans.push(Span::styled(
+            if app.prices_enabled {
+                "Loading prices..."
+            } else {
+                "Set a license key (orbitflare auth set-license-key) to show live prices"
+            },
+            Style::default().fg(label),
+        )),
+    }
 
     let prices = &app.prices;
     let len = prices.len();
@@ -68,14 +78,17 @@ fn render_ticker(frame: &mut Frame, app: &App, area: Rect) {
             };
             spans.push(Span::styled(icon, style));
             spans.push(Span::styled(format!("{} ", coin.symbol), bold_style));
-            spans.push(Span::styled(format!("${:.2}  ", coin.price), bold_style));
+            spans.push(Span::styled(
+                format!("{}  ", super::models::format_price(coin.price)),
+                bold_style,
+            ));
         } else {
             spans.push(Span::styled(
                 format!("{}:", coin.symbol),
                 Style::default().fg(label),
             ));
             spans.push(Span::styled(
-                format!(" ${:.2}  ", coin.price),
+                format!(" {}  ", super::models::format_price(coin.price)),
                 Style::default().fg(value),
             ));
         }

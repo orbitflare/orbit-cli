@@ -1,5 +1,6 @@
 # OrbitFlare Jetstream — Full Config Reference
 # Usage: orbitflare jet --config examples/jet-stream.yml
+# Jetstream streams transactions only. For account updates use `orbitflare grpc` (Yellowstone).
 
 transactions:
   pumpfun:
@@ -7,6 +8,9 @@ transactions:
       - "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
     account_include: []
     account_exclude: []
+    # Fee payer, compute budget, program IDs, size and resolved lookup tables.
+    # Applies to the whole subscription once any filter sets it (or pass --enrichment).
+    include_enrichment: true
 
   jupiter-swaps:
     account_include:
@@ -49,27 +53,6 @@ transactions:
     account_exclude:
       - "Vote111111111111111111111111111111111111111"
     account_required: []
-
-accounts:
-  my-wallet:
-    account:
-      - "Dv5tkHtFPHbQWncFqHB7Hdi3TJfgKE3W2vFhqspBVJPP"
-    owner: []
-
-  spl-token-accounts:
-    account: []
-    owner:
-      - "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-
-  raydium-pool:
-    account:
-      - "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2"
-    owner: []
-
-  pumpfun-state:
-    account: []
-    owner:
-      - "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
 
 timeout_secs: 30
 tcp_keepalive_secs: 60

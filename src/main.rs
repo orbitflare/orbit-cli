@@ -5,6 +5,7 @@ mod config;
 pub mod error;
 pub mod keyring_store;
 pub mod output;
+mod regions;
 
 use clap::Parser;
 use cli::{Cli, Commands};
@@ -99,32 +100,39 @@ fn resolve_profile<'a>(
     profile_override.or(config.auth.default_profile.as_deref())
 }
 
+fn resolve_region(region_flag: Option<&str>, config: &config::Config) -> CliResult<String> {
+    let region = region_flag
+        .or(Some(config.network.region.as_str()).filter(|r| !r.is_empty()))
+        .unwrap_or(regions::DEFAULT_REGION);
+    Ok(regions::validate(region)?)
+}
+
 fn resolve_rpc_context(
-    network_flag: Option<&str>,
+    network: &str,
+    region: &str,
     rpc_url_flag: Option<&str>,
     commitment_flag: Option<&str>,
     fallback_urls: &[String],
     config: &config::Config,
     profile: Option<&str>,
-) -> RpcContext {
+) -> CliResult<RpcContext> {
     let license_key = profile
         .and_then(|p| keyring_store::get_secret(p, "license_key"))
         .or_else(|| std::env::var("ORBITFLARE_LICENSE_KEY").ok());
 
-    let network = network_flag.unwrap_or(&config.network.default);
-
-    let base_rpc_url = if let Some(url) = rpc_url_flag {
-        url
+    let rpc_url = if let Some(url) = rpc_url_flag {
+        url.to_string()
     } else if network == "devnet" {
         if config.endpoints.rpc.devnet_url.is_empty() {
-            &config.endpoints.rpc.url
+            regions::DEVNET_RPC_URL.to_string()
         } else {
-            &config.endpoints.rpc.devnet_url
+            config.endpoints.rpc.devnet_url.clone()
         }
+    } else if !config.endpoints.rpc.url.is_empty() {
+        config.endpoints.rpc.url.clone()
     } else {
-        &config.endpoints.rpc.url
+        regions::rpc_url(region)?
     };
-    let rpc_url = base_rpc_url.to_string();
     let commitment = commitment_flag
         .unwrap_or(&config.preferences.commitment)
         .to_string();
@@ -139,38 +147,89 @@ fn resolve_rpc_context(
 
     let api_key = license_key.filter(|_| rpc_url.contains("orbitflare.com"));
 
-    RpcContext {
+    Ok(RpcContext {
         rpc_url,
         rpc_fallbacks,
         commitment,
         api_key,
+    })
+}
+
+fn resolve_grpc_url(
+    network: &str,
+    region: &str,
+    grpc_url_flag: Option<&str>,
+    config: &config::Config,
+) -> CliResult<String> {
+    if let Some(url) = grpc_url_flag {
+        return Ok(url.to_string());
     }
+    if network == "devnet" {
+        return Ok(if config.endpoints.grpc.devnet_url.is_empty() {
+            regions::DEVNET_GRPC_URL.to_string()
+        } else {
+            config.endpoints.grpc.devnet_url.clone()
+        });
+    }
+    if !config.endpoints.grpc.url.is_empty() {
+        return Ok(config.endpoints.grpc.url.clone());
+    }
+    Ok(regions::grpc_url(region)?)
+}
+
+fn resolve_jetstream_url(
+    network: &str,
+    region: &str,
+    url_flag: Option<&str>,
+    config: &config::Config,
+) -> CliResult<String> {
+    if let Some(url) = url_flag {
+        return Ok(url.to_string());
+    }
+    if network == "devnet" {
+        return Err("Jetstream streams mainnet only and has no devnet endpoint.".into());
+    }
+    if !config.endpoints.jetstream.url.is_empty() {
+        return Ok(config.endpoints.jetstream.url.clone());
+    }
+    Ok(regions::jetstream_url(region))
 }
 
 async fn dispatch(cli: Cli) -> CliResult<()> {
     let config = config::Config::load()?;
 
     let grpc_url = cli.grpc_url;
+    let jetstream_url = cli.jetstream_url;
     let ws_url = cli.ws_url;
     let fallback_url = cli.fallback_url;
-    let network = cli.network;
+    let network = cli
+        .network
+        .unwrap_or_else(|| config.network.default.clone());
+    regions::validate_network(&network)?;
+    let region = resolve_region(cli.region.as_deref(), &config)?;
     let profile_override = cli.profile;
 
     let needs_rpc = matches!(
         cli.command,
-        Commands::Ping { .. } | Commands::Rpc { .. } | Commands::Ws { .. }
+        Commands::Ping { .. }
+            | Commands::Rpc { .. }
+            | Commands::Das { .. }
+            | Commands::Ws { .. }
+            | Commands::Apex { .. }
+            | Commands::Dashboard
     );
     let profile = resolve_profile(profile_override.as_deref(), &config);
 
     let rpc_ctx = if needs_rpc {
         Some(resolve_rpc_context(
-            network.as_deref(),
+            &network,
+            &region,
             cli.rpc_url.as_deref(),
             cli.commitment.as_deref(),
             &fallback_url,
             &config,
             profile,
-        ))
+        )?)
     } else {
         None
     };
@@ -187,18 +246,27 @@ async fn dispatch(cli: Cli) -> CliResult<()> {
                 .filter(|u| !u.is_empty())
                 .collect();
 
-            let mut ping_js_urls = vec![
-                grpc_url
-                    .as_deref()
-                    .unwrap_or(&config.endpoints.jetstream.url)
-                    .to_string(),
-            ];
-            ping_js_urls.extend(config.endpoints.jetstream.fallback_url.clone());
+            let mut ping_js_urls: Vec<String> = Vec::new();
+            if let Ok(url) =
+                resolve_jetstream_url(&network, &region, jetstream_url.as_deref(), &config)
+            {
+                ping_js_urls.push(url);
+                ping_js_urls.extend(config.endpoints.jetstream.fallback_url.clone());
+            }
             let ping_js_urls: Vec<String> =
                 ping_js_urls.into_iter().filter(|u| !u.is_empty()).collect();
 
-            let mut ping_grpc_urls = vec![config.endpoints.grpc.url.clone()];
-            ping_grpc_urls.extend(config.endpoints.grpc.fallback_url.clone());
+            let mut ping_grpc_urls = vec![resolve_grpc_url(
+                &network,
+                &region,
+                grpc_url.as_deref(),
+                &config,
+            )?];
+            ping_grpc_urls.extend(if network == "devnet" {
+                config.endpoints.grpc.devnet_fallback_url.clone()
+            } else {
+                config.endpoints.grpc.fallback_url.clone()
+            });
             let ping_grpc_urls: Vec<String> = ping_grpc_urls
                 .into_iter()
                 .filter(|u| !u.is_empty())
@@ -208,57 +276,78 @@ async fn dispatch(cli: Cli) -> CliResult<()> {
         }
         Commands::Docs { topic } => commands::docs::run(topic),
         Commands::Jet(args) => {
-            let grpc_fallbacks = if !fallback_url.is_empty() {
+            let primary = resolve_jetstream_url(
+                &network,
+                &region,
+                jetstream_url.as_deref().or(grpc_url.as_deref()),
+                &config,
+            )?;
+            let fallbacks = if !fallback_url.is_empty() {
                 fallback_url
             } else {
                 config.endpoints.jetstream.fallback_url.clone()
             };
-            commands::jet::run(args, &config, grpc_url.as_deref(), &grpc_fallbacks).await
+            commands::jet::run(args, &primary, &fallbacks).await
         }
         Commands::Grpc(args) => {
-            let is_devnet = network.as_deref().unwrap_or(&config.network.default) == "devnet";
-            let primary = grpc_url
-                .as_deref()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| {
-                    if is_devnet && !config.endpoints.grpc.devnet_url.is_empty() {
-                        config.endpoints.grpc.devnet_url.clone()
-                    } else {
-                        config.endpoints.grpc.url.clone()
-                    }
-                });
+            let primary = resolve_grpc_url(&network, &region, grpc_url.as_deref(), &config)?;
             let grpc_fallbacks = if !fallback_url.is_empty() {
                 fallback_url
-            } else if is_devnet {
+            } else if network == "devnet" {
                 config.endpoints.grpc.devnet_fallback_url.clone()
             } else {
                 config.endpoints.grpc.fallback_url.clone()
             };
-            commands::grpc::run(args, &config, Some(&primary), &grpc_fallbacks).await
+            commands::grpc::run(args, &primary, &grpc_fallbacks).await
         }
         Commands::Rpc { command } => {
-            let ctx = rpc_ctx.unwrap();
-            let fallback_refs: Vec<&str> = ctx.rpc_fallbacks.iter().map(|s| s.as_str()).collect();
-            let mut builder = orbitflare_sdk::RpcClientBuilder::new()
-                .url(&ctx.rpc_url)
-                .fallback_urls(&fallback_refs)
-                .commitment(&ctx.commitment);
-            if let Some(ref key) = ctx.api_key {
-                builder = builder.api_key(key);
-            }
-            let rpc = builder.build()?;
+            let rpc = build_rpc_client(&rpc_ctx.unwrap())?;
             commands::rpc::run(command, &rpc).await
+        }
+        Commands::Das { command } => {
+            let rpc = build_rpc_client(&rpc_ctx.unwrap())?;
+            commands::das::run(command, &rpc).await
+        }
+        Commands::Apex { command } => {
+            let ctx = rpc_ctx.unwrap();
+            let rpc = commands::apex::needs_rpc(&command)
+                .then(|| build_rpc_client(&ctx))
+                .transpose()?;
+            let apex_key = keyring_store::get_secret(profile.unwrap_or("default"), "apex_key")
+                .or_else(|| std::env::var("ORBITFLARE_APEX_KEY").ok())
+                .filter(|k| !k.is_empty());
+            commands::apex::run(command, apex_key.as_deref(), rpc.as_ref()).await
         }
         Commands::Template(args) => commands::template::run(args, &config).await,
         Commands::Plan { command } => commands::plan::run(command, profile).await,
         Commands::Pay { command } => commands::pay::run(command, profile).await,
-        Commands::Dashboard => commands::dashboard::run().await,
+        Commands::Dashboard => {
+            let ctx = rpc_ctx.unwrap();
+            let rpc = if ctx.api_key.is_some() {
+                build_rpc_client(&ctx).ok()
+            } else {
+                None
+            };
+            commands::dashboard::run(rpc).await
+        }
         Commands::Ws { command } => {
             let ctx = rpc_ctx.unwrap();
             let ws = ws_url.unwrap_or_else(|| derive_ws_url(&ctx.rpc_url));
             commands::ws::run(command, &ws, &ctx.commitment, ctx.api_key.as_deref()).await
         }
     }
+}
+
+fn build_rpc_client(ctx: &RpcContext) -> CliResult<orbitflare_sdk::RpcClient> {
+    let fallback_refs: Vec<&str> = ctx.rpc_fallbacks.iter().map(|s| s.as_str()).collect();
+    let mut builder = orbitflare_sdk::RpcClientBuilder::new()
+        .url(&ctx.rpc_url)
+        .fallback_urls(&fallback_refs)
+        .commitment(&ctx.commitment);
+    if let Some(ref key) = ctx.api_key {
+        builder = builder.api_key(key);
+    }
+    Ok(builder.build()?)
 }
 
 fn derive_ws_url(rpc_url: &str) -> String {

@@ -39,6 +39,12 @@ pub enum CliError {
     #[error(transparent)]
     Sdk(#[from] orbitflare_sdk::Error),
 
+    #[error(transparent)]
+    Apex(#[from] orbitflare_apex::Error),
+
+    #[error(transparent)]
+    ApexRpc(#[from] orbitflare_apex::rpc::RpcError),
+
     #[error("{0}")]
     Other(String),
 }

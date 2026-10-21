@@ -40,12 +40,15 @@ pub struct AuthProfile {
 pub struct NetworkConfig {
     #[serde(default = "default_network")]
     pub default: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub region: String,
 }
 
 impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
             default: default_network(),
+            region: String::new(),
         }
     }
 }
@@ -96,7 +99,7 @@ impl Default for RpcEndpoint {
 }
 
 fn default_rpc_devnet_url() -> String {
-    "http://devnet.rpc.orbitflare.com".into()
+    crate::regions::DEVNET_RPC_URL.into()
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -123,7 +126,7 @@ impl Default for GrpcEndpoint {
 }
 
 fn default_grpc_devnet_url() -> String {
-    "http://devnet.rpc.orbitflare.com:10000".into()
+    crate::regions::DEVNET_GRPC_URL.into()
 }
 
 #[derive(Debug, Serialize, Deserialize)]

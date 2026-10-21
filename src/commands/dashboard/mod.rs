@@ -4,6 +4,7 @@ mod models;
 pub mod theme;
 mod ui;
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use ratatui::{DefaultTerminal, crossterm::event::KeyEventKind};
@@ -18,7 +19,7 @@ use models::{
     ApiKeyItem, ConnectedAccountItem, Endpoint, Invoice, InvoiceStatus, IpEntry, Location, Service,
     ServiceInfo, ServiceStatus,
 };
-pub async fn run() -> CliResult<()> {
+pub async fn run(rpc: Option<orbitflare_sdk::RpcClient>) -> CliResult<()> {
     eprintln!("  Loading dashboard data...");
 
     let config = Config::load().unwrap_or_default();
@@ -38,7 +39,7 @@ pub async fn run() -> CliResult<()> {
         fetch_dashboard_data(&api, api_key.as_deref(), token.as_deref(), initial_theme).await;
 
     let mut terminal = ratatui::init();
-    let result = run_loop(&mut terminal, data, &api).await;
+    let result = run_loop(&mut terminal, data, &api, rpc).await;
     ratatui::restore();
 
     if let Ok(mut cfg) = Config::load() {
@@ -192,27 +193,7 @@ async fn fetch_dashboard_data(
     }
 
     let api_invoices = api.invoices().await.unwrap_or_default();
-    let invoices: Vec<Invoice> = api_invoices
-        .iter()
-        .map(|inv| {
-            let status = match inv.status.as_deref() {
-                Some("paid") => InvoiceStatus::Paid,
-                _ => InvoiceStatus::Pending,
-            };
-            Invoice {
-                id: inv
-                    .reference
-                    .clone()
-                    .unwrap_or_else(|| format!("#{}", inv.id.unwrap_or(0))),
-                amount: inv
-                    .amount
-                    .map(|a| format!("${:.2}", a))
-                    .unwrap_or_else(|| "—".into()),
-                date: inv.created_at.clone().unwrap_or_else(|| "—".into()),
-                status,
-            }
-        })
-        .collect();
+    let invoices: Vec<Invoice> = api_invoices.iter().map(to_invoice).collect();
 
     let api_key_entries = api.api_keys().await.unwrap_or_default();
     let api_keys: Vec<ApiKeyItem> = api_key_entries
@@ -242,6 +223,25 @@ async fn fetch_dashboard_data(
         api_keys,
         connected_accounts,
         theme: initial_theme,
+    }
+}
+
+fn to_invoice(inv: &crate::api_client::InvoiceData) -> Invoice {
+    let status = match inv.status.as_deref() {
+        Some("paid") => InvoiceStatus::Paid,
+        _ => InvoiceStatus::Pending,
+    };
+    Invoice {
+        id: inv.reference.clone().unwrap_or_else(|| "—".into()),
+        amount: inv
+            .billing_total
+            .map(|a| format!("${:.2}", a))
+            .unwrap_or_else(|| "—".into()),
+        date: match format_date(inv.created_at.as_deref()) {
+            d if d == "—" => inv.created_at.clone().unwrap_or(d),
+            d => d,
+        },
+        status,
     }
 }
 
@@ -323,15 +323,35 @@ async fn run_loop(
     terminal: &mut DefaultTerminal,
     data: DashboardData,
     api: &OrbitApi,
+    rpc: Option<orbitflare_sdk::RpcClient>,
 ) -> CliResult<theme::ThemeName> {
     let mut app = App::new(data);
     let mut events = EventHandler::new(Duration::from_millis(250));
+
+    let (price_tx, mut price_rx) = tokio::sync::mpsc::channel(1);
+    if let Some(rpc) = rpc {
+        app.prices_enabled = true;
+        let rpc = Arc::new(rpc);
+        tokio::spawn(async move {
+            loop {
+                if let Some(prices) = models::fetch_prices(&rpc).await
+                    && price_tx.send(prices).await.is_err()
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+        });
+    }
 
     terminal.draw(|frame| ui::render(frame, &app))?;
 
     while app.running {
         match events.next().await {
             Some(Event::Tick) => {
+                while let Ok(prices) = price_rx.try_recv() {
+                    app.set_prices(prices);
+                }
                 app.tick();
                 terminal.draw(|frame| ui::render(frame, &app))?;
             }
@@ -675,27 +695,7 @@ async fn execute_action(app: &mut App, api: &OrbitApi, action: app::Action) {
         }
         app::Action::RefreshInvoices => {
             let api_invoices = api.invoices().await.unwrap_or_default();
-            app.invoices = api_invoices
-                .iter()
-                .map(|inv| {
-                    let status = match inv.status.as_deref() {
-                        Some("paid") => InvoiceStatus::Paid,
-                        _ => InvoiceStatus::Pending,
-                    };
-                    Invoice {
-                        id: inv
-                            .reference
-                            .clone()
-                            .unwrap_or_else(|| format!("#{}", inv.id.unwrap_or(0))),
-                        amount: inv
-                            .amount
-                            .map(|a| format!("${:.2}", a))
-                            .unwrap_or_else(|| "—".into()),
-                        date: inv.created_at.clone().unwrap_or_else(|| "—".into()),
-                        status,
-                    }
-                })
-                .collect();
+            app.invoices = api_invoices.iter().map(to_invoice).collect();
             if app.invoices_selected >= app.invoices.len() && !app.invoices.is_empty() {
                 app.invoices_selected = app.invoices.len() - 1;
             }

@@ -127,9 +127,11 @@ async fn fetch_plans(profile: Option<&str>) -> CliResult<Vec<RpcPlan>> {
     if let Some(cached) = read_cache() {
         return Ok(cached);
     }
-    let api = get_api(profile)?;
     eprintln!("  {} Fetching plans...", "→".dimmed());
-    let plans = api.rpc_plans().await?;
+    let plans = match get_api(profile) {
+        Ok(api) => api.rpc_plans().await?,
+        Err(_) => crate::api_client::public_rpc_plans().await?,
+    };
     write_cache(&plans);
     Ok(plans)
 }
@@ -216,31 +218,31 @@ async fn view(slug: &str, profile: Option<&str>) -> CliResult<()> {
         }
     }
 
-    if let Some(serde_json::Value::Object(ref map)) = p.pricing {
-        if !map.is_empty() {
-            println!();
-            println!("  Pricing:");
-            for (k, v) in map {
-                let label = k.replace('_', " ");
-                println!("    {:<20} {}", label, val_display(&Some(v.clone())));
-            }
+    if let Some(serde_json::Value::Object(ref map)) = p.pricing
+        && !map.is_empty()
+    {
+        println!();
+        println!("  Pricing:");
+        for (k, v) in map {
+            let label = k.replace('_', " ");
+            println!("    {:<20} {}", label, val_display(&Some(v.clone())));
         }
     }
 
-    if let Some(serde_json::Value::Object(ref map)) = p.limits {
-        if !map.is_empty() {
-            println!();
-            println!("  Limits:");
-            for (k, v) in map {
-                let label = k.replace('_', " ");
-                let display = val_display(&Some(v.clone()));
-                let colored = match display.as_str() {
-                    "Yes" | "true" => display.green().to_string(),
-                    "No" | "false" => display.red().to_string(),
-                    _ => display,
-                };
-                println!("    {:<20} {}", label, colored);
-            }
+    if let Some(serde_json::Value::Object(ref map)) = p.limits
+        && !map.is_empty()
+    {
+        println!();
+        println!("  Limits:");
+        for (k, v) in map {
+            let label = k.replace('_', " ");
+            let display = val_display(&Some(v.clone()));
+            let colored = match display.as_str() {
+                "Yes" | "true" => display.green().to_string(),
+                "No" | "false" => display.red().to_string(),
+                _ => display,
+            };
+            println!("    {:<20} {}", label, colored);
         }
     }
 

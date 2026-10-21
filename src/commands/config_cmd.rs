@@ -44,10 +44,23 @@ fn show() -> CliResult<()> {
     println!();
     println!("  {}", "Network".bold());
     println!("    {:<20} {}", "default:", config.network.default);
+    println!(
+        "    {:<20} {}",
+        "region:",
+        if config.network.region.is_empty() {
+            format!("{} (default)", crate::regions::DEFAULT_REGION)
+        } else {
+            config.network.region.clone()
+        }
+    );
 
     println!();
     println!("  {}", "Endpoints".bold());
-    println!("    {:<20} {}", "rpc.url:", config.endpoints.rpc.url);
+    println!(
+        "    {:<20} {}",
+        "rpc.url:",
+        or_region(&config.endpoints.rpc.url)
+    );
     println!(
         "    {:<20} {}",
         "rpc.devnet_url:", config.endpoints.rpc.devnet_url
@@ -59,14 +72,19 @@ fn show() -> CliResult<()> {
     }
     println!(
         "    {:<20} {}",
-        "jetstream.url:", config.endpoints.jetstream.url
+        "jetstream.url:",
+        or_region(&config.endpoints.jetstream.url)
     );
     if !config.endpoints.jetstream.fallback_url.is_empty() {
         for (i, fb) in config.endpoints.jetstream.fallback_url.iter().enumerate() {
             println!("    {:<20} {}", format!("jetstream.fallback[{}]:", i), fb);
         }
     }
-    println!("    {:<20} {}", "grpc.url:", config.endpoints.grpc.url);
+    println!(
+        "    {:<20} {}",
+        "grpc.url:",
+        or_region(&config.endpoints.grpc.url)
+    );
     println!(
         "    {:<20} {}",
         "grpc.devnet_url:", config.endpoints.grpc.devnet_url
@@ -117,10 +135,19 @@ fn set(key: String, value: String) -> CliResult<()> {
         }
     } else {
         match key.as_str() {
-            "network" => config.network.default = value.clone(),
+            "network" => {
+                crate::regions::validate_network(&value)?;
+                config.network.default = value.clone()
+            }
+            "region" => config.network.region = crate::regions::validate(&value)?,
             "output_format" => config.preferences.output_format = value.clone(),
             "color" => config.preferences.color = value.parse().map_err(|e| format!("Invalid boolean value: {}", e))?,
-            "commitment" => config.preferences.commitment = value.clone(),
+            "commitment" => {
+                if !matches!(value.as_str(), "processed" | "confirmed" | "finalized") {
+                    return Err("commitment must be processed, confirmed or finalized".into());
+                }
+                config.preferences.commitment = value.clone()
+            }
             "theme" => config.preferences.theme = value.clone(),
             "rpc.url" | "rpc" => config.endpoints.rpc.url = value.clone(),
             "rpc.devnet_url" => config.endpoints.rpc.devnet_url = value.clone(),
@@ -128,7 +155,7 @@ fn set(key: String, value: String) -> CliResult<()> {
             "jetstream.url" | "jetstream" => config.endpoints.jetstream.url = value.clone(),
             "grpc.url" | "grpc" => config.endpoints.grpc.url = value.clone(),
             "templates.repo" | "repo" => config.templates.repo = value.clone(),
-            _ => return Err(format!("Unknown config key: '{}'\nAvailable: network, output_format, color, commitment, theme, rpc.url, rpc.devnet_url, rpc.fallback, rpc.devnet_fallback, jetstream.url, jetstream.fallback, grpc.url, grpc.devnet_url, grpc.fallback, grpc.devnet_fallback, templates.repo", key).into()),
+            _ => return Err(format!("Unknown config key: '{}'\nAvailable: network, region, output_format, color, commitment, theme, rpc.url, rpc.devnet_url, rpc.fallback, rpc.devnet_fallback, jetstream.url, jetstream.fallback, grpc.url, grpc.devnet_url, grpc.fallback, grpc.devnet_fallback, templates.repo", key).into()),
         }
     }
 
@@ -164,6 +191,14 @@ fn reset() -> CliResult<()> {
     config.save()?;
     println!("{} Configuration reset to defaults", "✓".green().bold());
     Ok(())
+}
+
+fn or_region(url: &str) -> String {
+    if url.is_empty() {
+        "(from region)".to_string()
+    } else {
+        url.to_string()
+    }
 }
 
 fn mask_token(token: &str) -> String {

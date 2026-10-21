@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(
     name = "orbitflare",
-    version = "0.3.0",
+    version,
     about = "OrbitFlare Developer CLI",
     long_about = "The single entry point for everything a developer needs from OrbitFlare:\n\
                   streaming on-chain data, querying the blockchain, scaffolding projects, and monitoring usage."
@@ -20,9 +20,13 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub raw: bool,
 
-    /// Override network (mainnet|devnet|testnet)
+    /// Override network (mainnet|devnet)
     #[arg(long, global = true)]
     pub network: Option<String>,
+
+    /// Region for default endpoints (va, ny, la, slc, ams, fra, lon, jp, sg; Jetstream also dub, sqq, sgp)
+    #[arg(long, global = true)]
+    pub region: Option<String>,
 
     /// Override commitment (processed|confirmed|finalized)
     #[arg(long, global = true)]
@@ -32,9 +36,13 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub rpc_url: Option<String>,
 
-    /// Override gRPC endpoint
+    /// Override Yellowstone gRPC endpoint
     #[arg(long, global = true)]
     pub grpc_url: Option<String>,
+
+    /// Override Jetstream endpoint
+    #[arg(long, global = true)]
+    pub jetstream_url: Option<String>,
 
     /// Override WebSocket endpoint (default: derived from RPC URL)
     #[arg(long, global = true)]
@@ -71,23 +79,33 @@ pub enum Commands {
     },
     /// Check connection to OrbitFlare services
     Ping {
-        /// Ping a specific service (rpc, grpc, jupiter, jito)
+        /// Ping a specific service (rpc, jetstream, grpc)
         #[arg(long)]
         service: Option<String>,
     },
     /// Open documentation in browser
     Docs {
-        /// Documentation topic (e.g., stream, template grpc-indexer)
+        /// Topic (cli, rpc, ws, jet, grpc, das, history, apex, sdk, api) or a docs path
         topic: Vec<String>,
     },
-    /// Real-time gRPC streaming (Jetstream)
+    /// Real-time transaction streaming (Jetstream)
     Jet(JetArgs),
     /// Real-time gRPC streaming (Yellowstone Geyser)
     Grpc(GrpcArgs),
+    /// Send transactions through Apex
+    Apex {
+        #[command(subcommand)]
+        command: ApexCommands,
+    },
     /// Execute RPC queries
     Rpc {
         #[command(subcommand)]
         command: RpcCommands,
+    },
+    /// Query tokens, NFTs and compressed assets (Digital Asset Standard API)
+    Das {
+        #[command(subcommand)]
+        command: DasCommands,
     },
     /// Real-time WebSocket subscriptions (Solana pubsub)
     Ws {
@@ -139,6 +157,11 @@ pub enum AuthCommands {
         /// The license key
         key: String,
     },
+    /// Set your Apex API key
+    SetApexKey {
+        /// The Apex API key
+        key: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -166,8 +189,29 @@ pub enum ConfigCommands {
 #[derive(clap::Args)]
 pub struct JetArgs {
     /// Path to stream config YAML file
+    #[arg(long, required_unless_present_any = ["include", "required", "slots"])]
+    pub config: Option<String>,
+    /// Stream transactions touching any of these accounts (repeatable)
+    #[arg(long, conflicts_with = "config")]
+    pub include: Vec<String>,
+    /// Drop transactions touching these accounts (repeatable)
+    #[arg(long, conflicts_with = "config")]
+    pub exclude: Vec<String>,
+    /// Stream transactions touching all of these accounts (repeatable)
+    #[arg(long, conflicts_with = "config")]
+    pub required: Vec<String>,
+    /// Request enriched transactions (fee payer, compute budget, program IDs, size, resolved lookup tables)
+    #[arg(long, conflicts_with = "v1")]
+    pub enrichment: bool,
+    /// Stream slot lifecycle events (alive, complete, dead) instead of transactions
+    #[arg(long, conflicts_with_all = ["config", "include", "required", "exclude", "v1"])]
+    pub slots: bool,
+    /// Use the deprecated Jetstream v1 protocol
     #[arg(long)]
-    pub config: String,
+    pub v1: bool,
+    /// Stop after this many seconds
+    #[arg(long)]
+    pub duration: Option<u64>,
 }
 
 #[derive(clap::Args)]
@@ -175,6 +219,9 @@ pub struct GrpcArgs {
     /// Path to gRPC stream config YAML file
     #[arg(long)]
     pub config: String,
+    /// Stop after this many seconds
+    #[arg(long)]
+    pub duration: Option<u64>,
 }
 
 #[derive(Subcommand)]
@@ -200,6 +247,68 @@ pub enum WsCommands {
 }
 
 #[derive(Subcommand)]
+pub enum ApexCommands {
+    /// Measure latency to each Apex region
+    Ping {
+        /// Ping a single region (global, fra, ams, dub, lon, nyc, slc, sgp, tyo, sqq)
+        #[arg(long)]
+        region: Option<String>,
+    },
+    /// List the tip accounts Apex accepts
+    TipAccounts {
+        /// Apex region to query
+        #[arg(long, default_value = "global")]
+        region: String,
+    },
+    /// Send a signed transaction over Apex QUIC
+    #[command(
+        after_help = "The transaction must carry exactly one top-level SystemProgram transfer of at least 0.001 SOL to an Apex tip account (see `apex tip-accounts`) in its static account keys."
+    )]
+    Send {
+        /// Signed transaction, base64 or base58
+        #[arg(required_unless_present = "file", conflicts_with = "file")]
+        transaction: Option<String>,
+        /// Read the transaction from a file (base64, base58 or raw bytes)
+        #[arg(long)]
+        file: Option<String>,
+        /// Apex region to send through
+        #[arg(long, default_value = "global")]
+        region: String,
+        /// Skip leaders on the Shield blocklist
+        #[arg(long)]
+        mev_protect: bool,
+        /// Do not check the tip rule locally before sending
+        #[arg(long)]
+        skip_tip_check: bool,
+        /// Wait for on-chain confirmation via the configured RPC
+        #[arg(long)]
+        confirm: bool,
+    },
+    /// Transfer SOL through Apex, with the tip added and signed by a keypair
+    Transfer {
+        /// Recipient address
+        to: String,
+        /// Amount in SOL
+        amount: String,
+        /// Path to Solana wallet keypair file (default: ~/.config/solana/id.json)
+        #[arg(long)]
+        wallet: Option<String>,
+        /// Apex tip in SOL (minimum 0.001)
+        #[arg(long, default_value = "0.001")]
+        tip: String,
+        /// Compute unit price in micro-lamports
+        #[arg(long, default_value_t = 10_000)]
+        cu_price: u64,
+        /// Apex region to send through
+        #[arg(long, default_value = "global")]
+        region: String,
+        /// Skip leaders on the Shield blocklist
+        #[arg(long)]
+        mev_protect: bool,
+    },
+}
+
+#[derive(Subcommand)]
 pub enum RpcCommands {
     /// Get account info
     Account {
@@ -221,13 +330,31 @@ pub enum RpcCommands {
         /// Transaction signature
         signature: String,
     },
-    /// Get recent transactions for a wallet
+    /// Get transaction history for an address (getTransactionsForAddress)
     History {
-        /// Wallet address
+        /// Wallet or account address
         wallet: String,
-        /// Maximum number of transactions
+        /// Maximum number of transactions (up to 1000)
         #[arg(long, default_value = "10")]
         limit: u32,
+        /// Oldest first instead of newest first
+        #[arg(long)]
+        oldest_first: bool,
+        /// Only succeeded or failed transactions (succeeded|failed)
+        #[arg(long)]
+        status: Option<String>,
+        /// Include token account activity (none|balanceChanged|all)
+        #[arg(long)]
+        token_accounts: Option<String>,
+        /// Only transactions at or after this time (unix seconds or YYYY-MM-DD)
+        #[arg(long)]
+        since: Option<String>,
+        /// Only transactions before this time (unix seconds or YYYY-MM-DD)
+        #[arg(long)]
+        until: Option<String>,
+        /// Continue from a previous page's pagination token
+        #[arg(long)]
+        page_token: Option<String>,
     },
     /// Get program accounts
     ProgramAccounts {
@@ -300,7 +427,7 @@ pub enum PayCommands {
     History,
     /// Purchase an RPC plan using account balance
     Purchase {
-        /// Plan slug (e.g., solana-rpc-lite)
+        /// Plan slug (e.g., dev, growth, scale; see `plan list`)
         slug: String,
         /// Billing period (monthly, quarterly, semi-annual, annual)
         period: String,
@@ -347,5 +474,103 @@ pub enum PlanCommands {
         /// Compare all available plans
         #[arg(long)]
         all: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum DasCommands {
+    /// Get one or more assets by ID (mint or asset address)
+    Asset {
+        /// Asset IDs
+        #[arg(required = true)]
+        ids: Vec<String>,
+    },
+    /// Wallet portfolio: SOL, fungible tokens with prices, and NFTs
+    Owner {
+        /// Owner address
+        address: String,
+        /// Only fungible tokens
+        #[arg(long, conflicts_with = "nfts")]
+        tokens: bool,
+        /// Only NFTs and other non-fungible assets
+        #[arg(long)]
+        nfts: bool,
+        /// Page size (up to 1000)
+        #[arg(long, default_value = "50")]
+        limit: u32,
+        /// Page number
+        #[arg(long, default_value = "1")]
+        page: u32,
+    },
+    /// Search assets by owner, creator, authority, collection, name and more
+    Search {
+        /// Owner address
+        #[arg(long)]
+        owner: Option<String>,
+        /// Creator address
+        #[arg(long)]
+        creator: Option<String>,
+        /// Update authority address
+        #[arg(long)]
+        authority: Option<String>,
+        /// Collection address
+        #[arg(long)]
+        collection: Option<String>,
+        /// Asset name (requires --owner)
+        #[arg(long, requires = "owner")]
+        name: Option<String>,
+        /// Token type (fungible|nonFungible|regularNFT|compressedNFT|all)
+        #[arg(long)]
+        token_type: Option<String>,
+        /// Only compressed (true) or uncompressed (false) assets
+        #[arg(long)]
+        compressed: Option<bool>,
+        /// Only burnt (true) or live (false) assets
+        #[arg(long)]
+        burnt: Option<bool>,
+        /// Page size (up to 1000)
+        #[arg(long, default_value = "50")]
+        limit: u32,
+        /// Page number
+        #[arg(long, default_value = "1")]
+        page: u32,
+    },
+    /// List the assets in a collection
+    Collection {
+        /// Collection address
+        address: String,
+        /// Page size (up to 1000)
+        #[arg(long, default_value = "50")]
+        limit: u32,
+        /// Page number
+        #[arg(long, default_value = "1")]
+        page: u32,
+    },
+    /// List the token accounts (holders) of a mint
+    Holders {
+        /// Token mint address
+        mint: String,
+        /// Page size (up to 1000)
+        #[arg(long, default_value = "50")]
+        limit: u32,
+        /// Page number
+        #[arg(long, default_value = "1")]
+        page: u32,
+    },
+    /// Get the Merkle proof of a compressed asset
+    Proof {
+        /// Asset ID
+        id: String,
+    },
+    /// List the transactions that changed a compressed asset
+    Signatures {
+        /// Asset ID
+        id: String,
+        /// Page size (up to 1000)
+        #[arg(long, default_value = "50")]
+        limit: u32,
+        /// Page number
+        #[arg(long, default_value = "1")]
+        page: u32,
     },
 }
