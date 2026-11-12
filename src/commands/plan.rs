@@ -210,6 +210,20 @@ async fn view(slug: &str, profile: Option<&str>) -> CliResult<()> {
     println!("  Base Price: {}", format_price(&p.base_price).green());
     println!("  Type:       {}", p.price_type.as_deref().unwrap_or("—"));
 
+    if !p.locations.is_empty() {
+        println!();
+        println!("  Regions:");
+        for l in &p.locations {
+            let label = l.label.as_deref().unwrap_or("");
+            let stock = if l.in_stock {
+                String::new()
+            } else {
+                format!(" {}", "(out of stock)".dimmed())
+            };
+            println!("    {:<12} {}{}", l.value.cyan(), label, stock);
+        }
+    }
+
     if !p.features.is_empty() {
         println!();
         println!("  Features:");

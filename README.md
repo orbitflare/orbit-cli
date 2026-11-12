@@ -235,8 +235,9 @@ orbitflare pay topup <AMOUNT> --wallet /path/to/keypair.json
 orbitflare pay history
 
 # Purchase a plan (from balance)
-orbitflare pay purchase <SLUG> <PERIOD> --coupon <CODE>
+orbitflare pay purchase <SLUG> <PERIOD> --location <REGION> --coupon <CODE>
 # period: monthly | quarterly | semi-annual | annual
+# region: plans sold in several regions need one (see `plan view <SLUG>`); you are asked if it is left out
 
 # Orders
 orbitflare pay order --history

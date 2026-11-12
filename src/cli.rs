@@ -431,6 +431,9 @@ pub enum PayCommands {
         slug: String,
         /// Billing period (monthly, quarterly, semi-annual, annual)
         period: String,
+        /// Region to buy the plan in (see `plan view <slug>`); asked for when the plan has several
+        #[arg(long)]
+        location: Option<String>,
         /// Discount code
         #[arg(long)]
         coupon: Option<String>,

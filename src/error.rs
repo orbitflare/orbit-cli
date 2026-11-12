@@ -36,6 +36,9 @@ pub enum CliError {
     #[error("wallet_not_linked")]
     WalletNotLinked,
 
+    #[error("two_factor_required")]
+    TwoFactorRequired,
+
     #[error(transparent)]
     Sdk(#[from] orbitflare_sdk::Error),
 

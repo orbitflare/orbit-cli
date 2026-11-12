@@ -1,4 +1,4 @@
-use crate::api_client::OrbitApi;
+use crate::api_client::{OrbitApi, PlanLocation};
 use crate::cli::PayCommands;
 use crate::error::CliResult;
 use crate::keyring_store;
@@ -21,8 +21,18 @@ pub async fn run(cmd: PayCommands, profile: Option<&str>) -> CliResult<()> {
         PayCommands::Purchase {
             slug,
             period,
+            location,
             coupon,
-        } => purchase(&slug, &period, coupon.as_deref(), profile).await,
+        } => {
+            purchase(
+                &slug,
+                &period,
+                location.as_deref(),
+                coupon.as_deref(),
+                profile,
+            )
+            .await
+        }
         PayCommands::Order { reference, history } => {
             order(reference.as_deref(), history, profile).await
         }
@@ -203,8 +213,21 @@ async fn topup(amount: f64, wallet_path: Option<&str>, profile: Option<&str>) ->
             "balance": result.balance,
             "invoice_reference": result.invoice_reference,
             "transaction_signature": result.transaction_signature,
+            "confirmation": result.confirmation,
         });
         println!("{}", serde_json::to_string_pretty(&json)?);
+    } else if result.confirmation.as_deref() == Some("pending") {
+        eprintln!(
+            "  {} Payment submitted and still confirming. Your balance updates once it does; do not send it again.",
+            "→".yellow()
+        );
+        if let Some(ref sig) = result.transaction_signature {
+            println!(
+                "  TX:        {}",
+                format!("https://solscan.io/tx/{}", sig).cyan()
+            );
+        }
+        println!();
     } else {
         eprintln!("  {} Top-up complete!", "✓".green().bold());
         println!();
@@ -283,6 +306,7 @@ async fn history(profile: Option<&str>) -> CliResult<()> {
 async fn purchase(
     slug: &str,
     period: &str,
+    location: Option<&str>,
     coupon: Option<&str>,
     profile: Option<&str>,
 ) -> CliResult<()> {
@@ -298,8 +322,11 @@ async fn purchase(
 
     let api = get_api(profile)?;
 
+    let location = resolve_location(&api, slug, location).await?;
+    let location = location.as_deref();
+
     eprintln!("  {} Validating order...", "→".dimmed());
-    let validation = api.orders_validate(slug, period, coupon).await?;
+    let validation = api.orders_validate(slug, period, location, coupon).await?;
 
     let can_afford = validation.can_afford.unwrap_or(false);
     let user_balance = val_to_f64(&validation.user_balance);
@@ -323,6 +350,9 @@ async fn purchase(
         println!();
         println!("  Plan:           {}", slug.cyan());
         println!("  Period:         {}", period);
+        if let Some(location) = location {
+            println!("  Location:       {}", location);
+        }
         if let Some(p) = pricing {
             println!("  Base price:     {}", format_price(&p.base_price));
             if p.period_months.is_some() {
@@ -359,7 +389,7 @@ async fn purchase(
     }
 
     eprintln!("  {} Processing purchase...", "→".dimmed());
-    let result = api.orders_purchase(slug, period, coupon).await?;
+    let result = api.orders_purchase(slug, period, location, coupon).await?;
 
     if output::is_json() {
         let json = serde_json::json!({
@@ -393,6 +423,85 @@ async fn purchase(
     }
 
     Ok(())
+}
+
+fn describe_location(l: &PlanLocation) -> String {
+    match l.label.as_deref() {
+        Some(label) if !label.is_empty() && label != l.value => format!("{} ({})", l.value, label),
+        _ => l.value.clone(),
+    }
+}
+
+/// The region to order in. A plan sold in more than one region must name one:
+/// the given --location is checked against the plan, otherwise the user picks
+/// from the in-stock regions (or, with --json, is told to pass --location).
+async fn resolve_location(
+    api: &OrbitApi,
+    slug: &str,
+    location: Option<&str>,
+) -> CliResult<Option<String>> {
+    let plans = api.rpc_plans().await?;
+    let Some(plan) = plans.into_iter().find(|p| p.slug.as_deref() == Some(slug)) else {
+        // Unknown slug: validation reports it.
+        return Ok(location.map(str::to_string));
+    };
+
+    let in_stock: Vec<&PlanLocation> = plan.locations.iter().filter(|l| l.in_stock).collect();
+    let choices = || {
+        in_stock
+            .iter()
+            .map(|l| describe_location(l))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+
+    if let Some(location) = location {
+        if !plan.locations.is_empty() && !plan.locations.iter().any(|l| l.value == location) {
+            return Err(format!(
+                "'{}' is not a region this plan is sold in. Choose one of: {}",
+                location,
+                choices()
+            )
+            .into());
+        }
+        return Ok(Some(location.to_string()));
+    }
+
+    if !plan.location_required {
+        return Ok(None);
+    }
+    if in_stock.is_empty() {
+        return Err("This plan is out of stock in every region.".into());
+    }
+    if in_stock.len() == 1 {
+        return Ok(Some(in_stock[0].value.clone()));
+    }
+    if output::is_json() {
+        return Err(format!(
+            "This plan is sold in several regions. Pass --location with one of: {}",
+            choices()
+        )
+        .into());
+    }
+
+    println!();
+    println!("  This plan is sold in several regions. Pick one:");
+    for (i, l) in in_stock.iter().enumerate() {
+        println!("    {}. {}", i + 1, describe_location(l));
+    }
+    print!("  Region [1-{}]: ", in_stock.len());
+    io::stdout().flush()?;
+    let mut answer = String::new();
+    io::stdin().read_line(&mut answer)?;
+    let picked = answer
+        .trim()
+        .parse::<usize>()
+        .ok()
+        .and_then(|n| n.checked_sub(1))
+        .and_then(|i| in_stock.get(i))
+        .ok_or("No region picked. Pass --location <region> to choose one.")?;
+
+    Ok(Some(picked.value.clone()))
 }
 
 async fn order(reference: Option<&str>, history: bool, profile: Option<&str>) -> CliResult<()> {

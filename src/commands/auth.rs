@@ -189,8 +189,29 @@ async fn login_wallet(keypair_path: &str, profile_name: &str) -> CliResult<()> {
     let signature = signing_key.sign(challenge_data.challenge.as_bytes());
     let sig_bs58 = bs58::encode(signature.to_bytes()).into_string();
 
+    let challenge_id = challenge_data.challenge_id.as_deref();
+
     eprintln!("  {} Verifying signature...", "→".dimmed());
-    match api.wallet_verify(&wallet_address, &sig_bs58).await {
+    let verified = match api
+        .wallet_verify(&wallet_address, &sig_bs58, challenge_id, None)
+        .await
+    {
+        Err(CliError::TwoFactorRequired) => {
+            print!("  Two-factor code: ");
+            io::stdout().flush()?;
+            let mut code = String::new();
+            io::stdin().read_line(&mut code)?;
+            let code = code.trim();
+            if code.is_empty() {
+                return Err("This account needs a two-factor code to sign in.".into());
+            }
+            api.wallet_verify(&wallet_address, &sig_bs58, challenge_id, Some(code))
+                .await
+        }
+        other => other,
+    };
+
+    match verified {
         Ok(auth_data) => {
             let user = if let Some(u) = auth_data.user {
                 u
@@ -234,6 +255,7 @@ async fn login_wallet(keypair_path: &str, profile_name: &str) -> CliResult<()> {
                 &signing_key,
                 &wallet_address,
                 &challenge_data.challenge,
+                challenge_id,
                 profile_name,
             )
             .await
@@ -247,6 +269,7 @@ async fn register_wallet(
     signing_key: &ed25519_dalek::SigningKey,
     wallet_address: &str,
     challenge: &str,
+    challenge_id: Option<&str>,
     profile_name: &str,
 ) -> CliResult<()> {
     use ed25519_dalek::Signer;
@@ -272,7 +295,7 @@ async fn register_wallet(
 
     eprintln!("  {} Registering wallet...", "→".dimmed());
     let auth_data = api
-        .wallet_register(wallet_address, &sig_bs58, &name, &email)
+        .wallet_register(wallet_address, &sig_bs58, &name, &email, challenge_id)
         .await?;
 
     let stored_api_key = auth_data.api_key.and_then(|k| k.key);

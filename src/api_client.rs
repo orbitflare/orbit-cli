@@ -35,6 +35,8 @@ pub struct DeviceTokenData {
 #[derive(Deserialize, Debug, Default)]
 pub struct WalletChallengeData {
     pub challenge: String,
+    #[serde(default)]
+    pub challenge_id: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -290,6 +292,9 @@ pub struct TopupConfirmData {
     pub invoice_reference: Option<String>,
     #[serde(default)]
     pub transaction_signature: Option<String>,
+    /// "pending" when the transaction was already submitted and is still confirming.
+    #[serde(default)]
+    pub confirmation: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -360,6 +365,27 @@ pub struct RpcPlan {
     pub base_price: Option<serde_json::Value>,
     #[serde(default)]
     pub limits: Option<serde_json::Value>,
+    /// Regions the plan is sold in; send a `value` as the order's `location`.
+    #[serde(default)]
+    pub locations: Vec<PlanLocation>,
+    /// True when the plan is sold in more than one region and an order must name one.
+    #[serde(default)]
+    pub location_required: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct PlanLocation {
+    pub value: String,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub country_code: Option<String>,
+    #[serde(default = "default_true")]
+    pub in_stock: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Deserialize, Default)]
@@ -754,11 +780,21 @@ impl OrbitApi {
         &self,
         wallet_address: &str,
         signature: &str,
+        challenge_id: Option<&str>,
+        code: Option<&str>,
     ) -> CliResult<WalletAuthData> {
+        let mut body =
+            serde_json::json!({ "wallet_address": wallet_address, "signature": signature });
+        if let Some(id) = challenge_id {
+            body["challenge_id"] = serde_json::json!(id);
+        }
+        if let Some(code) = code {
+            body["code"] = serde_json::json!(code);
+        }
         let req = self
             .client
             .post(format!("{}/auth/wallet/verify", BASE_URL))
-            .json(&serde_json::json!({ "wallet_address": wallet_address, "signature": signature }));
+            .json(&body);
         let resp = self.auth_header(req).send().await?;
         let status = resp.status();
         let text = resp.text().await?;
@@ -766,10 +802,12 @@ impl OrbitApi {
             if status.as_u16() == 404 {
                 return Err(CliError::WalletNotLinked);
             }
-            if let Ok(parsed) = serde_json::from_str::<ApiResponse<serde_json::Value>>(&text)
-                && parsed.error.as_deref() == Some("wallet_not_linked")
-            {
-                return Err(CliError::WalletNotLinked);
+            if let Ok(parsed) = serde_json::from_str::<ApiResponse<serde_json::Value>>(&text) {
+                match parsed.error.as_deref() {
+                    Some("wallet_not_linked") => return Err(CliError::WalletNotLinked),
+                    Some("two_factor_required") => return Err(CliError::TwoFactorRequired),
+                    _ => {}
+                }
             }
             return Err(format!(
                 "POST /auth/wallet/verify — HTTP {}: {}",
@@ -794,13 +832,30 @@ impl OrbitApi {
         signature: &str,
         name: &str,
         email: &str,
+        challenge_id: Option<&str>,
     ) -> CliResult<WalletAuthData> {
-        let req = self.client
+        let mut body = serde_json::json!({ "wallet_address": wallet_address, "signature": signature, "name": name, "email": email });
+        if let Some(id) = challenge_id {
+            body["challenge_id"] = serde_json::json!(id);
+        }
+        let req = self
+            .client
             .post(format!("{}/auth/wallet/register", BASE_URL))
-            .json(&serde_json::json!({ "wallet_address": wallet_address, "signature": signature, "name": name, "email": email }));
+            .json(&body);
         let resp = self.auth_header(req).send().await?;
         let status = resp.status();
+        let retry_after = resp
+            .headers()
+            .get(reqwest::header::RETRY_AFTER)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok());
         let text = resp.text().await?;
+        if status.as_u16() == 429 {
+            let wait = retry_after
+                .map(|s| format!(" Try again in {} minute(s).", s.div_ceil(60).max(1)))
+                .unwrap_or_default();
+            return Err(format!("{}{}", extract_error(&text), wait).into());
+        }
         if !status.is_success() {
             return Err(format!(
                 "POST /auth/wallet/register — HTTP {}: {}",
@@ -1250,10 +1305,14 @@ impl OrbitApi {
         &self,
         product_slug: &str,
         billing_period: &str,
+        location: Option<&str>,
         discount_code: Option<&str>,
     ) -> ApiResult<OrderValidateData> {
         let mut body =
             serde_json::json!({ "product_slug": product_slug, "billing_period": billing_period });
+        if let Some(location) = location {
+            body["location"] = serde_json::json!(location);
+        }
         if let Some(code) = discount_code {
             body["discount_code"] = serde_json::json!(code);
         }
@@ -1270,10 +1329,14 @@ impl OrbitApi {
         &self,
         product_slug: &str,
         billing_period: &str,
+        location: Option<&str>,
         discount_code: Option<&str>,
     ) -> ApiResult<OrderPurchaseData> {
         let mut body =
             serde_json::json!({ "product_slug": product_slug, "billing_period": billing_period });
+        if let Some(location) = location {
+            body["location"] = serde_json::json!(location);
+        }
         if let Some(code) = discount_code {
             body["discount_code"] = serde_json::json!(code);
         }
@@ -1425,5 +1488,25 @@ mod tests {
         assert_eq!(inv.billing_total, Some(49.0));
         assert_eq!(inv.billing_balance, Some(49.0));
         assert_eq!(inv.invoice_type.as_deref(), Some("renewal"));
+    }
+
+    #[test]
+    fn reads_plan_locations() {
+        let plan: RpcPlan = serde_json::from_value(serde_json::json!({
+            "slug": "growth",
+            "location_required": true,
+            "locations": [
+                {"value": "ams", "label": "Amsterdam", "country_code": "NL", "in_stock": true},
+                {"value": "fra", "label": "Frankfurt", "in_stock": false}
+            ]
+        }))
+        .unwrap();
+        assert!(plan.location_required);
+        assert_eq!(plan.locations.len(), 2);
+        assert!(!plan.locations[1].in_stock);
+
+        let older: RpcPlan = serde_json::from_value(serde_json::json!({"slug": "dev"})).unwrap();
+        assert!(!older.location_required);
+        assert!(older.locations.is_empty());
     }
 }
